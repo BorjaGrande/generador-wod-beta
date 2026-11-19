@@ -41,4 +41,13 @@ La programación no se rellena automáticamente a partir de conversaciones de Ch
 
 ## Versionado
 
-La app beta utiliza la clave `generador-wod-beta-v1` y la caché `generador-wod-beta-cache-v1.0.0`; no modifica el repositorio ni el almacenamiento del Contador WOD.
+La app beta utiliza la clave `generador-wod-beta-v1` y la caché `generador-wod-beta-cache-v1.0.1`; no modifica el repositorio ni el almacenamiento del Contador WOD.
+
+
+## Ajuste v1.0.1 Beta — diseño en iPhone
+
+- Los campos **Fecha del WOD** y **Perfil de material** aparecen en dos filas independientes en pantallas pequeñas para evitar que el selector de fecha se superponga al perfil.
+- Las fechas de Programación y Registro también tienen ancho completo en móvil.
+- No se modifica la lógica del generador ni la clave de almacenamiento `generador-wod-beta-v1`.
+- Se incrementa la versión de caché offline a `generador-wod-beta-cache-v1.0.1`.
+- Para actualizar: sube los nueve archivos a la raíz del mismo repositorio, conecta el iPhone a internet, abre la app y ciérrala/ábrela de nuevo para que se actualice la caché. No elimines el icono ni borres datos de Safari.
