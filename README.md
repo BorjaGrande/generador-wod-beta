@@ -1,4 +1,4 @@
-# Generador WOD · 1.0.2 Beta
+# Generador WOD · 1.0.3 Beta
 
 Aplicación independiente de **Contador WOD 2.2**, desarrollada como PWA para iPhone y GitHub Pages.
 
@@ -41,7 +41,7 @@ La programación no se rellena automáticamente a partir de conversaciones de Ch
 
 ## Versionado
 
-La app beta utiliza la clave `generador-wod-beta-v1` y la caché `generador-wod-beta-cache-v1.0.2`; no modifica el repositorio ni el almacenamiento del Contador WOD.
+La app beta utiliza la clave `generador-wod-beta-v1` y la caché `generador-wod-beta-cache-v1.0.3`; no modifica el repositorio ni el almacenamiento del Contador WOD.
 
 
 ## Ajuste v1.0.1 Beta — diseño en iPhone
@@ -49,7 +49,7 @@ La app beta utiliza la clave `generador-wod-beta-v1` y la caché `generador-wod-
 - Los campos **Fecha del WOD** y **Perfil de material** aparecen en dos filas independientes en pantallas pequeñas para evitar que el selector de fecha se superponga al perfil.
 - Las fechas de Programación y Registro también tienen ancho completo en móvil.
 - No se modifica la lógica del generador ni la clave de almacenamiento `generador-wod-beta-v1`.
-- Se incrementa la versión de caché offline a `generador-wod-beta-cache-v1.0.2`.
+- Se incrementa la versión de caché offline a `generador-wod-beta-cache-v1.0.3`.
 - Para actualizar: sube los nueve archivos a la raíz del mismo repositorio, conecta el iPhone a internet, abre la app y ciérrala/ábrela de nuevo para que se actualice la caché. No elimines el icono ni borres datos de Safari.
 
 
@@ -60,8 +60,30 @@ La app beta utiliza la clave `generador-wod-beta-v1` y la caché `generador-wod-
 - Ajusta la apariencia y las dimensiones del selector nativo, con contención defensiva del campo en el formulario.
 - Aplica el mismo tratamiento a los selectores de fecha de Programación y Registro.
 - No cambia la generación, inventario, historial, datos guardados ni la clave de almacenamiento `generador-wod-beta-v1`.
-- Actualiza la caché offline a `generador-wod-beta-cache-v1.0.2`.
+- Actualiza la caché offline a `generador-wod-beta-cache-v1.0.3`.
 - Antes de actualizar, exporta una copia JSON desde **Registro → Copias de seguridad**, como medida preventiva.
 - Publicación: subir los nueve archivos descomprimidos a la raíz del repositorio `generador-wod-beta`.
 - Prueba: abrir primero en Safari **privado** para observar el diseño, después en la app instalada con conexión. Cerrar y volver a abrir la aplicación para actualizar sus recursos. **No borrar los datos del sitio ni desinstalar la app.**
 - La corrección se ha comprobado estáticamente; debe validarse en un iPhone real.
+
+
+## Cambio v1.0.3 Beta — algoritmo de generación
+
+- Equilibra patrones principales: máximo un movimiento dominante de sentadilla, bisagra de cadera u overhead por WOD, salvo que el movimiento incluya varios patrones por sí mismo.
+- El objetivo mixto busca variedad de cardio, carga y gimnasia/core cuando el material y los movimientos permitidos lo hacen posible.
+- EMOM calcula dosis aproximadas de 25–45 segundos de trabajo por estación, **no garantías de tiempo real**. No recomienda ejercicios sin dosis adecuada en el minuto.
+- AMRAP/FOR TIME ajustan repeticiones de movimientos rápidos de cardio (por ejemplo, Jumping Jacks) y moderan movimientos técnicamente exigentes.
+- TABATA clásico: 1 bloque de 8×(20/10) = 4 min. Para más tiempo usa bloques de 4 min con recuperación entre bloques cuando cabe dentro de la duración solicitada; si no cabe, indica la duración real ajustada.
+- TABATA evita movimientos técnicamente complejos o de carga pesada; restringe duración a 4–20 min.
+- Se mantienen inventario, planificación oficial, clave `generador-wod-beta-v1`, WODs guardados, registro y copia de seguridad.
+- La valoración de interferencias sigue siendo heurística; no garantiza individualización de cargas ni ausencia de fatiga.
+
+### Prueba rápida
+
+1. Exportar copia JSON desde Registro antes de actualizar.
+2. Subir los nueve archivos a la raíz de GitHub y esperar despliegue.
+3. Comprobar `v1.0.3 BETA`. Probar con DB, KB y comba, generación libre de EMOM 15', AMRAP 15' y TABATA 15'.
+4. Verificar TABATA por bloques y que el tiempo de estaciones EMOM sea orientativamente 25–45 segundos.
+5. Comprobar con modo avión, recuperación local de material y resultados anteriores.
+
+**Importante:** los descansos interbloque de TABATA no se envían automáticamente al Contador WOD 2.2, que todavía se abre para configurarlo manualmente.
