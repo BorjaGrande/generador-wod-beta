@@ -9,3 +9,44 @@
   .form-grid > .wod-profile-field,
   .form-grid > .date-field { grid-column: 1 / -1; }
 }
+
+
+/* v1.0.2: corrección específica para el input date nativo de Safari en iOS.
+   En iOS puede conservar una anchura intrínseca mayor que su columna Grid.
+   El campo y sus límites quedan contenidos en el panel. */
+.form-grid > .wod-date-field,
+.form-grid > .date-field {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+  overflow: hidden; /* Contención defensiva para el control nativo iOS. */
+}
+.form-grid > .wod-date-field > input[type="date"],
+.form-grid > .date-field > input[type="date"] {
+  display: block;
+  -webkit-appearance: none;
+  appearance: none;
+  box-sizing: border-box;
+  inline-size: 100%;
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  margin-left: 0;
+  margin-right: 0;
+  font-size: 16px; /* Evita zoom del input al enfocarlo en iPhone. */
+}
+/* Safari: evitar que el valor de fecha imponga tamaño mínimo. */
+input[type="date"]::-webkit-date-and-time-value {
+  min-width: 0;
+  text-align: center;
+}
+@media (max-width: 600px) {
+  .form-grid > .wod-date-field,
+  .form-grid > .wod-profile-field,
+  .form-grid > .date-field {
+    grid-column: 1 / -1;
+  }
+}
