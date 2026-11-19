@@ -1,5 +1,5 @@
 // Generador WOD beta — motor local, independiente de la interfaz y sin servicios externos.
-export const VERSION = '1.0.3-beta';
+export const VERSION = '1.0.4-beta';
 export const EQUIPMENT_GROUPS = [
  {title:'Máquinas',items:[['airbike','Assault / Echo Bike'],['bikeerg','BikeErg'],['skierg','SkiErg'],['rowerg','RowErg / remo'],['treadmill','Cinta de correr']]},
  {title:'Pesos y cargas',items:[['db','Mancuernas (DB)'],['kb','Kettlebells (KB)'],['barbell','Barra olímpica'],['plates','Discos bumper'],['rack','Rack para sentadillas'],['sandbag','Sandbag'],['wallball','Wall Ball'],['medball','Balón medicinal']]},
@@ -24,11 +24,11 @@ export const MOVEMENTS = [
  ['wallballs','Wall Balls',['wallball'],['squat','overhead'],2,'reps'],['medball','Med Ball Cleans',['medball'],['hinge','squat'],2,'reps'],['sandbag','Sandbag Clean',['sandbag'],['hinge','pull'],2,'reps'],['sled','Sled Push',['sled','carry'],['legs'],2,'meters']
 ].map(([id,name,req,patterns,tier,unit,skill])=>({id,name,req,patterns,tier,unit,skill:skill||null}));
 export const PATTERN_NAMES = {squat:'Piernas (sentadilla)',legs:'Piernas / carrera',hinge:'Cadena posterior',pull:'Tracción',push:'Empuje',overhead:'Hombros / overhead',grip:'Agarre',core:'Core',cardio:'Cardio'};
-export const DEFAULT_STATE = () => ({version:VERSION,profiles:[{id:'principal',name:'Mi material',equipment:{}}],activeProfile:'principal',skills:[],plan:[],wods:[],logs:[],lastWod:null});
+export const DEFAULT_STATE = () => ({version:VERSION,profiles:[{id:'principal',name:'Mi material',equipment:{}}],activeProfile:'principal',skills:[],plan:[],wods:[],logs:[],lastWod:null,lastRecommendation:null});
 export function sanitizeState(raw) {
  const d=DEFAULT_STATE(); if(!raw||typeof raw!=='object')return d;
  const profiles=Array.isArray(raw.profiles)?raw.profiles.filter(p=>p&&typeof p.id==='string'&&typeof p.name==='string'&&p.equipment&&typeof p.equipment==='object').slice(0,15):[];
- return {version:VERSION,profiles:profiles.length?profiles:d.profiles,activeProfile:typeof raw.activeProfile==='string'?raw.activeProfile:d.activeProfile,skills:Array.isArray(raw.skills)?raw.skills.filter(x=>SKILLS.some(s=>s[0]===x)):[],plan:Array.isArray(raw.plan)?raw.plan.filter(p=>p&&isISODate(p.date)&&typeof p.title==='string').slice(0,1000):[],wods:Array.isArray(raw.wods)?raw.wods.filter(w=>w&&Array.isArray(w.movements)).slice(0,1000):[],logs:Array.isArray(raw.logs)?raw.logs.filter(w=>w&&typeof w.date==='string').slice(0,2000):[],lastWod:raw.lastWod&&Array.isArray(raw.lastWod.movements)?raw.lastWod:null};
+ return {version:VERSION,profiles:profiles.length?profiles:d.profiles,activeProfile:typeof raw.activeProfile==='string'?raw.activeProfile:d.activeProfile,skills:Array.isArray(raw.skills)?raw.skills.filter(x=>SKILLS.some(s=>s[0]===x)):[],plan:Array.isArray(raw.plan)?raw.plan.filter(p=>p&&isISODate(p.date)&&typeof p.title==='string').slice(0,1000):[],wods:Array.isArray(raw.wods)?raw.wods.filter(w=>w&&Array.isArray(w.movements)).slice(0,1000):[],logs:Array.isArray(raw.logs)?raw.logs.filter(w=>w&&typeof w.date==='string').slice(0,2000):[],lastWod:raw.lastWod&&Array.isArray(raw.lastWod.movements)&&raw.lastWod.kind!=='recovery'?raw.lastWod:null,lastRecommendation:raw.lastRecommendation?.kind==='recovery'&&Array.isArray(raw.lastRecommendation.movements)?raw.lastRecommendation:null};
 }
 export function isISODate(s){if(typeof s!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(s))return false;const d=new Date(s+'T12:00:00Z');return !Number.isNaN(d.getTime())&&d.toISOString().slice(0,10)===s;}
 export function daysApart(a,b){const x=Date.parse(a+'T12:00:00Z'),y=Date.parse(b+'T12:00:00Z');return Number.isFinite(x)&&Number.isFinite(y)?Math.round((x-y)/86400000):Infinity;}
@@ -44,11 +44,94 @@ const rules=[
  ['cardio',/run|row|remo|bike|ski|burpee|jump|comba|carrera|assault/i]
 ];
 export function inferPatterns(input){const text=String(input||'');return rules.filter(([,r])=>r.test(text)).map(([id])=>id);}
+// La estimación de fatiga NO sustituye a una medición de recuperación real.
+// +1 significa sesión oficial mañana, -1 significa sesión oficial ayer.
 export function getStress(plan,logs,date){
- const scores={};const details=[];
- for(const p of plan){const diff=Math.abs(daysApart(p.date,date));if(diff>2)continue;const weight=[3,2,0.8][diff]*(Math.max(1,Math.min(10,Number(p.rpe)||7))/7);const patterns=inferPatterns(`${p.title} ${p.movements||''} ${p.notes||''}`);for(const pattern of patterns)scores[pattern]=(scores[pattern]||0)+weight;details.push({date:p.date,title:p.title,source:'Planificación',patterns});}
- for(const l of logs){const diff=daysApart(date,l.date);if(diff<0||diff>2)continue;const weight=[2.6,1.8,0.6][diff]*(Math.max(1,Math.min(10,Number(l.rpe)||7))/7);const patterns=Array.isArray(l.patterns)&&l.patterns.length?l.patterns:inferPatterns(l.movementsText||'');for(const pattern of patterns)scores[pattern]=(scores[pattern]||0)+weight;details.push({date:l.date,title:l.title||'WOD registrado',source:'Registro',patterns});}
+ const scores={}; const details=[];
+ for(const p of plan){
+  const offset=daysApart(p.date,date); const diff=Math.abs(offset);
+  if(diff>2)continue;
+  // Mayor protección de la próxima sesión oficial que de la ya realizada.
+  const base=offset===0?3.4:offset===1?2.7:offset===-1?2.1:offset===2?1.0:0.75;
+  const rpe=Math.max(1,Math.min(10,Number(p.rpe)||7));
+  const weight=base*(rpe/7);
+  const patterns=inferPatterns(`${p.title} ${p.movements||''}`);
+  for(const pattern of patterns)scores[pattern]=(scores[pattern]||0)+weight;
+  details.push({date:p.date,title:p.title,source:'Planificación',patterns,rpe,offset,weight});
+ }
+ for(const l of logs){
+  const offset=daysApart(l.date,date);
+  if(offset>0||offset< -2)continue; // No anticipamos resultados de fechas futuras.
+  const diff=Math.abs(offset);
+  const base=diff===0?2.8:diff===1?2.2:0.7;
+  const rpe=Math.max(1,Math.min(10,Number(l.rpe)||7));
+  const weight=base*(rpe/7);
+  const patterns=Array.isArray(l.patterns)&&l.patterns.length?l.patterns:inferPatterns(l.movementsText||'');
+  for(const pattern of patterns)scores[pattern]=(scores[pattern]||0)+weight;
+  details.push({date:l.date,title:l.title||'WOD registrado',source:'Registro',patterns,rpe,offset,weight});
+ }
  return {scores,details};
+}
+// Evaluamos el riesgo de forma conservadora. Si la información es insuficiente
+// no afirmamos que la propuesta esté libre de interferencias.
+export function assessIntelligentDay(stress){
+ const official=stress.details.filter(d=>d.source==='Planificación');
+ const before=official.filter(d=>d.offset===-1);
+ const after=official.filter(d=>d.offset===1);
+ const today=official.filter(d=>d.offset===0);
+ const logs=stress.details.filter(d=>d.source==='Registro'&&d.offset>=-1);
+ const overlaps=new Set(before.flatMap(d=>d.patterns).filter(p=>after.some(d=>d.patterns.includes(p))));
+ const highPatterns=Object.entries(stress.scores).filter(([,v])=>v>=3.7).map(([p])=>p);
+ const recentVeryHard=logs.some(d=>d.rpe>=9);
+ const tomorrowHard=after.some(d=>d.rpe>=8&&d.patterns.length>=3);
+ const denseBothSides=before.length>0&&after.length>0&&(
+  overlaps.size>=2 || highPatterns.length>=3 || (before.some(d=>d.rpe>=7)&&after.some(d=>d.rpe>=7))
+ );
+ const sameDay=today.some(d=>d.rpe>=7);
+ const shouldRecover=denseBothSides||sameDay||(recentVeryHard&&after.length>0)||tomorrowHard&&recentVeryHard;
+ let reason='';
+ if(denseBothSides)reason='Hay sesiones oficiales exigentes a ambos lados de esta fecha; añadir un WOD podría comprometer la recuperación para la siguiente sesión.';
+ else if(sameDay)reason='Ya hay una sesión oficial de intensidad moderada-alta programada para hoy.';
+ else if(recentVeryHard&&after.length)reason='Consta un entrenamiento reciente con RPE muy alto y hay otra sesión oficial próxima.';
+ const keySessions=[...before,...today,...after].map(d=>`${d.date} · ${d.title}`).slice(0,3);
+ return {shouldRecover,reason,keySessions,highPatterns,closeOfficial:official.some(d=>Math.abs(d.offset)<=1)};
+}
+function recoveryRecommendation(date,level,objective,stress,assessment){
+ const key=assessment.keySessions.join(' | ');
+ const hot=assessment.highPatterns.map(p=>PATTERN_NAMES[p]||p).slice(0,4);
+ return {
+  id:`recovery-${date}`,kind:'recovery',date,mode:'recuperacion',strategy:'inteligente',
+  level,objective,title:'Priorizar recuperación',movements:[
+   {name:'Movilidad suave sin fatiga adicional',amount:'8–10 min'},
+   {name:'Caminar tranquilo o respiración relajada',amount:'5 min (opcional)'}
+  ],intensity:'RPE 2–4/10, sin buscar fatiga',profileName:'Sin material obligatorio',
+  advice:'No se propone un WOD extra con carga. La sesión de recuperación es opcional; también puedes descansar completamente.',
+  notes:`${assessment.reason} ${hot.length?'Patrones a proteger: '+hot.join(', ')+'. ':''}${key?'Sesiones consideradas: '+key+'. ':''}La programación y el RPE son estimaciones: confirma tu recuperación real.`,
+  patterns:[],createdAt:new Date().toISOString()
+ };
+}
+// Patrones auxiliares: el movimiento puede fatigar zonas adicionales aunque no
+// sean su patrón principal (ej.: hombros en swing y empujes, agarre en deadlift).
+const SECONDARY_PATTERNS={
+ pushups:{overhead:0.6},burpees:{legs:0.7,overhead:0.4},
+ kbswing:{grip:0.7,overhead:0.35},kbclean:{grip:0.8},
+ dbdeadlift:{grip:0.7},dbsnatch:{grip:0.7},
+ mountain:{push:0.5},dblob:{core:0.35}
+};
+function movementStress(m,stress){
+ let score=m.patterns.reduce((n,p)=>n+(stress.scores[p]||0),0);
+ for(const [p,f] of Object.entries(SECONDARY_PATTERNS[m.id]||{}))score+=(stress.scores[p]||0)*f;
+ return score;
+}
+function smartAllowed(m,stress){
+ // Un patrón cargado ayer o previsto mañana debe evitarse, no solo penalizarse.
+ if(m.patterns.some(p=>(stress.scores[p]||0)>=1.9))return false;
+ const secondary=SECONDARY_PATTERNS[m.id]||{};
+ if(Object.entries(secondary).some(([p,mult])=>(stress.scores[p]||0)*mult>=1.75))return false;
+ // Movimientos olímpicos y complejos de alta exigencia no son buen extra
+ // próximo a las sesiones oficiales salvo baja carga observada.
+ if(m.tier>=3&&stress.details.some(d=>Math.abs(d.offset)<=1))return false;
+ return true;
 }
 export function eligibleMovements(profile,skills=[],level='intermedio'){
  const tiers={principiante:1,intermedio:2,avanzado:3};const allowed=tiers[level]||2;
@@ -141,7 +224,7 @@ function selectBalanced(pool,target,objective,strategy,stress,rng){
   const options=candidates.map(m=>{
    // Patrones secundarios cuentan como penalización de redundancia, no como veto total.
    const overlap=selected.reduce((sum,x)=>sum+m.patterns.filter(p=>x.patterns.includes(p)).length,0);
-   const stressWeight=strategy==='inteligente'?m.patterns.reduce((sum,p)=>sum+(stress.scores[p]||0),0):0;
+   const stressWeight=strategy==='inteligente'?movementStress(m,stress):0;
    const secondaryLoad=selected.filter(x=>isLoaded(x)).length;
    return {m,weight:1/(1+overlap*2.5+stressWeight*1.5+(isLoaded(m)?secondaryLoad*.7:0))};
   });
@@ -167,6 +250,22 @@ function tabataLayout(minutes){
  designs.sort((a,b)=>a.rank-b.rank||b.blocks-a.blocks);
  return designs[0];
 }
+function safeSmartAmount(m,mode,duration,level,stress){
+ const normal=makeAmount(m,mode,duration,level);
+ if(mode==='tabata'||mode==='emom')return normal;
+ // Control de dosis: el número de rondas puede multiplicar el volumen.
+ if(m.unit!=='reps')return normal;
+ let n=Number.parseInt(normal,10);
+ if(!Number.isFinite(n))return normal;
+ const near=movementStress(m,stress)>0.9;
+ // FOR TIME inteligente = 3 rondas: máximo 24–30 reps de movimientos
+ // exigentes, incluso en días con carga cercana.
+ const maxPerRound=mode==='fortime'?(m.patterns.includes('push')||m.patterns.includes('overhead')||m.patterns.includes('hinge')?8:10):
+  (m.patterns.includes('overhead')||m.patterns.includes('hinge')?10:14);
+ n=Math.min(n,maxPerRound);
+ if(near)n=Math.max(4,Math.round(n*0.7));
+ return `${n} reps`;
+}
 export function generateWod({state,mode='random',strategy='libre',duration=15,level='intermedio',objective='mixto',date,rng=Math.random}){
  if(!isISODate(date))throw new Error('Elige una fecha válida.');
  if(!['libre','inteligente'].includes(strategy))throw new Error('Estrategia no válida.');
@@ -181,31 +280,37 @@ export function generateWod({state,mode='random',strategy='libre',duration=15,le
  if(mode==='tabata'&&duration>20)throw new Error('Para TABATA elige entre 4 y 20 minutos. Para sesiones más largas utiliza otro formato.');
  const profile=state.profiles.find(p=>p.id===state.activeProfile)||state.profiles[0];
  const stress=getStress(strategy==='inteligente'?state.plan:[],strategy==='inteligente'?state.logs:[],date);
+ const assessment=strategy==='inteligente'?assessIntelligentDay(stress):null;
+ if(assessment?.shouldRecover)return recoveryRecommendation(date,level,objective,stress,assessment);
+ // En días adyacentes a entrenamientos oficiales reducimos la exposición.
+ const requestedDuration=duration;
+ if(strategy==='inteligente'&&assessment.closeOfficial)duration=Math.min(duration,12);
+
  const candidatePool=eligibleMovements(profile,state.skills,level);
- const overloaded=new Set(strategy==='inteligente'?Object.entries(stress.scores).filter(([,v])=>v>=2.3).map(([p])=>p):[]);
- let pool=candidatePool.filter(m=>!m.patterns.some(p=>overloaded.has(p)));
+ const overloaded=new Set(strategy==='inteligente'?Object.entries(stress.scores).filter(([,v])=>v>=1.9).map(([p])=>p):[]);
+ let pool=candidatePool.filter(m=>strategy!=='inteligente'||smartAllowed(m,stress));
  if(mode==='tabata')pool=pool.filter(m=>TABATA_SAFE.has(m.id));
  if(mode==='emom')pool=pool.filter(m=>stationDose(m,level)!==null);
- if(pool.length<(mode==='tabata'?1:2))throw new Error(strategy==='inteligente'?'La carga de sesiones próximas no deja suficiente variedad segura para este WOD. Reduce el estímulo o prioriza recuperación.':'No hay suficientes ejercicios compatibles con esta modalidad, material y nivel. Prueba otro formato o selecciona más equipamiento.');
+ if(pool.length<(mode==='tabata'?1:2)){if(strategy==='inteligente')return recoveryRecommendation(date,level,objective,stress,{...assessment,reason:'La carga detectada no deja suficientes ejercicios de bajo riesgo para componer un WOD extra.',highPatterns:Object.keys(stress.scores).filter(k=>stress.scores[k]>=1.9)});throw new Error('No hay suficientes ejercicios compatibles con esta modalidad, material y nivel. Prueba otro formato o selecciona más equipamiento.');}
  const layout=mode==='tabata'?tabataLayout(duration):null;
  const target=mode==='tabata'?Math.min(layout.blocks,pool.length):mode==='emom'?Math.min(4,Math.max(2,Math.round(duration/5))):duration<10?3:4;
  const selected=selectBalanced(pool,target,objective,strategy,stress,rng);
- if(selected.length<(mode==='tabata'&&layout.blocks===1?1:2))throw new Error('No se puede crear un WOD equilibrado con los ejercicios habilitados; selecciona más material, otro nivel u otra modalidad.');
+ if(selected.length<(mode==='tabata'&&layout.blocks===1?1:2)){if(strategy==='inteligente')return recoveryRecommendation(date,level,objective,stress,{...assessment,reason:'No hay una combinación equilibrada de ejercicios que respete las restricciones de carga.',highPatterns:Object.keys(stress.scores).filter(k=>stress.scores[k]>=1.9)});throw new Error('No se puede crear un WOD equilibrado con los ejercicios habilitados; selecciona más material, otro nivel u otra modalidad.');}
  const stations=mode==='tabata'?Array.from({length:layout.blocks},(_,i)=>selected[i%selected.length]):selected;
- const movementEntries=stations.map((m,i)=>({...m,amount:makeAmount(m,mode,duration,level),...(mode==='emom'?{estimateSeconds:stationDose(m,level).estimate}:{}),...(mode==='tabata'?{block:i+1}:{} )}));
+ const movementEntries=stations.map((m,i)=>({...m,amount:strategy==='inteligente'?safeSmartAmount(m,mode,duration,level,stress):makeAmount(m,mode,duration,level),...(mode==='emom'?{estimateSeconds:stationDose(m,level).estimate}:{}),...(mode==='tabata'?{block:i+1}:{} )}));
  const activeStress=Object.entries(stress.scores).filter(([,v])=>v>=2.3).sort((a,b)=>b[1]-a[1]).map(([p])=>PATTERN_NAMES[p]||p);
- const rounds=mode==='tabata'?layout.blocks*8:mode==='fortime'?(duration<=12?3:5):null;
+ const rounds=mode==='tabata'?layout.blocks*8:mode==='fortime'?(strategy==='inteligente'?3:(duration<=12?3:5)):null;
  const effectiveDuration=mode==='tabata'?layout.total/60:duration;
  const noteDuration=mode==='tabata'&&layout.total!==duration*60?` Duración solicitada: ${duration} min; ajustada a ${formatMinutes(effectiveDuration)} para respetar bloques completos y descansos.`:'';
- const notes=strategy==='inteligente'?(stress.details.length?`Se han ponderado ${stress.details.length} sesiones cercanas. ${activeStress.length?'Precaución con: '+activeStress.slice(0,3).join(', ')+'.':'No se detectan picos claros de carga con los datos cargados.'} Revisa intensidad, técnica y recuperación.`:'No hay sesiones cercanas registradas; selección basada en el material y nivel.'):'WOD aleatorio condicionado por material y nivel; revisa cargas antes de comenzar.';
+ const notes=strategy==='inteligente'?`Se han considerado ${stress.details.length} sesiones de programación y registro cercanas. ${activeStress.length?'Patrones protegidos: '+activeStress.slice(0,4).join(', ')+'. ':''}${duration<requestedDuration?'Duración ajustada de '+requestedDuration+' a '+duration+' min para limitar carga. ':''}Se han excluido movimientos de patrones exigidos recientemente o próximos. La compatibilidad es orientativa y depende de la recuperación real.`:'WOD aleatorio condicionado por material y nivel; revisa cargas antes de comenzar.';
  const advice=mode==='amrap'?'Máximas rondas y repeticiones en el tiempo indicado.':
  mode==='fortime'?`${rounds} rondas por tiempo. Time cap sugerido: ${duration} minutos.`:
  mode==='emom'?`Una estación por minuto, en orden, durante ${duration} min. Dosis orientativas de 25–45 s de trabajo; descansa el tiempo restante. Si no cabe con buena técnica, reduce repeticiones.`:
  `${layout.blocks} ${layout.blocks===1?'bloque':'bloques'} de 8×(20 s trabajo / 10 s descanso), 4 min por bloque${layout.blocks>1?layout.rest===0?', sin pausa adicional entre bloques':` y ${layout.rest} s de recuperación entre bloques`:''}. ${rounds} intervalos de trabajo en total.${noteDuration}`;
  const title=mode==='amrap'?`AMRAP ${duration}'`:mode==='fortime'?`FOR TIME · CAP ${duration}'`:mode==='emom'?`EMOM ${duration}'`:layout.blocks===1?`TABATA 4'`:`TABATA POR BLOQUES ${formatMinutes(effectiveDuration)}'`;
- return {id:`wod-${Date.now()}-${Math.floor(rng()*1e7)}`,date,mode,strategy,level,objective,duration:effectiveDuration,requestedDuration:duration,cap:duration,rounds,interval:mode==='emom'?60:mode==='tabata'?30:0,
+ return {id:`wod-${Date.now()}-${Math.floor(rng()*1e7)}`,date,mode,strategy,level,objective,duration:effectiveDuration,requestedDuration,cap:duration,rounds,interval:mode==='emom'?60:mode==='tabata'?30:0,
  ...(layout?{tabata:{blocks:layout.blocks,roundsPerBlock:8,workSeconds:20,restSeconds:10,betweenBlocksSeconds:layout.rest}}:{}),
- title,movements:movementEntries,patterns:[...new Set(selected.flatMap(m=>m.patterns))],notes,advice,profileName:profile.name,createdAt:new Date().toISOString(),intensity:strategy==='inteligente'?(activeStress.length?'RPE 5–6/10 orientativo':'RPE 6–7/10 orientativo'):'RPE 6–7/10 orientativo'};
+ title,movements:movementEntries,patterns:[...new Set(selected.flatMap(m=>m.patterns))],notes,advice,profileName:profile.name,createdAt:new Date().toISOString(),intensity:strategy==='inteligente'?(activeStress.length?'RPE 4–5/10 orientativo':'RPE 5–6/10 orientativo'):'RPE 6–7/10 orientativo'};
 }
 function formatMinutes(value){return Number.isInteger(value)?String(value):String(Number(value.toFixed(1))).replace('.',',');}
 export function readCSV(text){
@@ -228,6 +333,8 @@ export function parsePlanCSV(text){
  const invalid=items.find(p=>!isISODate(p.date)||!p.title.trim());if(invalid)throw new Error('Fecha o nombre incorrectos. Usa fechas AAAA-MM-DD.');return items;
 }
 export function formatWhatsapp(w){
+ if(w.kind==='recovery')return `*RECUPERACIÓN RECOMENDADA* · ${w.date}\n*No se propone WOD extra con carga*\n\n${w.movements.map((m,i)=>`${i+1}. ${m.amount} · ${m.name}`).join('\n')}\n\n*Motivo:* ${w.notes}\n*Intensidad:* ${w.intensity}\n\n${w.advice}`;
+
  const names={amrap:'AMRAP',fortime:'FOR TIME',emom:'EMOM',tabata:'TABATA'};
  const header=`*WOD ${w.strategy==='inteligente'?'EXTRA INTELIGENTE':'ALEATORIO'}*\n*${w.title}* · ${w.date}\nNivel: ${w.level} · Objetivo: ${w.objective}`;
  const movements=w.movements.map((m,i)=>w.mode==='tabata'?`Bloque ${i+1}: 8×20/10 · ${m.name}`:`${i+1}. ${m.amount} ${m.name}${w.mode==='emom'&&m.estimateSeconds?` (≈${m.estimateSeconds} s)`:''}`).join('\n');

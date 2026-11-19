@@ -1,4 +1,4 @@
-# Generador WOD · 1.0.3 Beta
+# Generador WOD · 1.0.4 Beta
 
 Aplicación independiente de **Contador WOD 2.2**, desarrollada como PWA para iPhone y GitHub Pages.
 
@@ -9,7 +9,7 @@ Aplicación independiente de **Contador WOD 2.2**, desarrollada como PWA para iP
 - Catálogo de movimientos, nivel técnico y habilidades.
 - Programación oficial: importación de CSV o registro manual de sesiones.
 - Generación de AMRAP, FOR TIME, EMOM y TABATA con filtros locales.
-- Modo inteligente: exige sesiones oficiales a ±2 días de la fecha elegida y penaliza patrones recientemente exigidos. **No garantiza ausencia de interferencias**.
+- Modo inteligente: exige sesiones oficiales a ±2 días, protege patrones sobrecargados y puede recomendar recuperación sin generar WOD. **No garantiza ausencia de interferencias**.
 - Guardado local de WODs y resultados, incluyendo cargas, RPE, RX/escalado y notas.
 - Exportación de registros a CSV y copia completa JSON.
 - Modo offline tras una primera apertura conectada y carga exitosa de la caché.
@@ -87,3 +87,25 @@ La app beta utiliza la clave `generador-wod-beta-v1` y la caché `generador-wod-
 5. Comprobar con modo avión, recuperación local de material y resultados anteriores.
 
 **Importante:** los descansos interbloque de TABATA no se envían automáticamente al Contador WOD 2.2, que todavía se abre para configurarlo manualmente.
+
+
+## Cambio v1.0.4 Beta — protección de WODs extra inteligentes
+
+- Si hay dos sesiones oficiales exigentes alrededor de la fecha elegida (por ejemplo, miércoles y viernes con WOD extra el jueves), el generador **puede recomendar recuperación en lugar de generar un WOD**. Esta recomendación no se guarda como WOD ejecutado.
+- Prioriza la sesión oficial posterior y considera sesiones anteriores, posteriores y resultados registrados en una ventana de hasta dos días.
+- Filtra patrones que tengan carga cercana (empuje, overhead, bisagra, agarre y otros) y considera patrones secundarios de algunos ejercicios.
+- Limita a tres rondas los FOR TIME inteligentes y modera sus repeticiones; si hay sesión oficial cercana, reduce a un máximo de 12 minutos el WOD extra y lo indica expresamente.
+- Explica en el resultado los motivos y patrones protegidos. **No promete eliminar todas las interferencias ni sustituye la evaluación individual de fatiga**.
+- El modo Libre y los cinco apartados ya existentes se mantienen. No se modifican la programación importada, los perfiles, los resultados ni la clave `generador-wod-beta-v1`. Se añade un campo opcional de recomendación a la estructura de estado.
+- Actualiza la caché a `generador-wod-beta-cache-v1.0.4`, manteniendo los nueve archivos en la raíz.
+
+### Pruebas recomendadas
+
+1. Exporta una copia JSON antes de actualizar y cierra cualquier sesión en curso.
+2. Después de subir los nueve archivos, abre la aplicación con conexión, cierra y abre de nuevo. Verifica `v1.0.4 BETA`.
+3. Con la planificación ORIGIN importada, selecciona el 2026-11-19, Extra inteligente, FOR TIME, 15 minutos, intermedio: debe recomendar recuperación, **sin mostrar 5 rondas de KB Swing + Push-ups**.
+4. Comprueba un día con una sola sesión oficial próxima, como el 2026-11-21: si propone un WOD, debe limitarlo y proteger patrones cargados; si no hay suficiente variedad segura, recomendar recuperación.
+5. Prueba Generación Libre y comprueba que inventario, programación y registros anteriores siguen visibles.
+6. Comprueba la apertura offline tras completar la actualización de los archivos.
+
+**Limitación:** la asignación RPE 7 de los CSV es orientativa, no una medida real. El sistema no mide fatiga fisiológica ni lesiones y sólo evalúa la programación de CrossFit proporcionada.

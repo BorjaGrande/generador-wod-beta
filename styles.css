@@ -50,3 +50,8 @@ input[type="date"]::-webkit-date-and-time-value {
     grid-column: 1 / -1;
   }
 }
+
+/* v1.0.4: recomendación de recuperación, no WOD generado. */
+.wod-result.recovery{border-color:#957549;background:linear-gradient(155deg,#2a2830,#151d2b)}
+.wod-result.recovery .wod-kicker,.wod-result.recovery .wod-amount{color:var(--warn)}
+.wod-result.recovery .wod-actions{grid-template-columns:1fr}
