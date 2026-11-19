@@ -1,5 +1,6 @@
 import {VERSION,EQUIPMENT_GROUPS,SKILLS,MOVEMENTS,PATTERN_NAMES,DEFAULT_STATE,sanitizeState,isISODate,daysApart,getStress,generateWod,parsePlanCSV,formatWhatsapp,toCSV} from './core.mjs';
 const STORAGE_KEY='generador-wod-beta-v1';
+let pendingRecoveryOptions=null;
 const $=id=>document.getElementById(id);
 const now=()=>{const t=new Date();return [t.getFullYear(),String(t.getMonth()+1).padStart(2,'0'),String(t.getDate()).padStart(2,'0')].join('-')};
 const node=(tag,text,klass)=>{const e=document.createElement(tag);if(text!==undefined&&text!==null)e.textContent=String(text);if(klass)e.className=klass;return e;};
@@ -30,7 +31,7 @@ $('download-template').addEventListener('click',()=>downloadFile('plantilla-prog
 $('plan-file').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{if(file.size>1_000_000)throw new Error('El archivo supera 1 MB.');const items=parsePlanCSV(await file.text());if(items.length>800)throw new Error('Demasiadas sesiones para una única importación.');let added=0;for(const item of items){const idx=state.plan.findIndex(x=>x.date===item.date&&x.title.toLowerCase()===item.title.toLowerCase());if(idx>=0)state.plan[idx]={...item,id:state.plan[idx].id};else{state.plan.push(item);added++}}save();renderPlan();notice(`CSV importado: ${items.length} sesiones leídas, ${added} nuevas. Revisa los ejercicios para que el análisis de carga sea útil.`)}catch(err){notice(`Error de importación: ${err.message}`,'error')}e.target.value='';});
 $('clear-plan').addEventListener('click',()=>{if(!state.plan.length)return;if(!confirm('¿Borrar todas las sesiones oficiales cargadas? Exporta una copia primero si las necesitas.'))return;state.plan=[];save();renderPlan();notice('Programación eliminada.');});
 function renderWod(w){
- const panel=$('wod-result');panel.replaceChildren();panel.classList.toggle('recovery',w?.kind==='recovery');
+ const panel=$('wod-result');panel.replaceChildren();panel.classList.toggle('recovery',w?.kind==='recovery');panel.classList.toggle('caution',!!w?.forcedAgainstAdvice);
  if(!w){panel.classList.add('hidden');return}
  panel.classList.remove('hidden');
  if(w.kind==='recovery'){
@@ -38,18 +39,53 @@ function renderWod(w){
   panel.append(node('p','El análisis aconseja priorizar la recuperación. Este aviso no se añadirá a los WODs guardados ni a los resultados.','wod-info'));
   for(const m of w.movements){const line=node('div',null,'wod-movement');line.append(node('div',m.amount,'wod-amount'),node('div',m.name,'wod-name'));panel.append(line)}
   const info=node('div',null,'wod-advice');info.append(node('b',w.advice),node('p',`Intensidad: ${w.intensity}`),node('p',`Motivo: ${w.notes}`));panel.append(info);
-  const actions=node('div',null,'wod-actions');actions.append(btn('Copiar recomendación',()=>copyText(formatWhatsapp(w)),'ghost'));panel.append(actions);
+  const actions=node('div',null,'wod-actions');actions.append(btn('Copiar recomendación',()=>copyText(formatWhatsapp(w)),'ghost'),btn('Generar de todos modos',()=>askRecoveryConfirmation(pendingRecoveryOptions),'caution-action'));panel.append(actions);
   return;
  }
- panel.append(node('div',w.strategy==='inteligente'?'WOD EXTRA INTELIGENTE':'WOD LIBRE','wod-kicker'),node('h2',w.title,'wod-title'));
+ panel.append(node('div',w.forcedAgainstAdvice?'WOD EXTRA CON PRECAUCIÓN':w.strategy==='inteligente'?'WOD EXTRA INTELIGENTE':'WOD LIBRE','wod-kicker'),node('h2',w.title,'wod-title'));
+ if(w.forcedAgainstAdvice)panel.append(node('p','Se ha generado a petición tuya pese a recomendar recuperación. Es una sesión de muy baja carga, no un WOD intenso. Puedes descansar en su lugar.','wod-info')); 
  const tags=node('div');for(const t of [w.date,w.level,w.objective,w.profileName])tags.append(node('span',t,'tag'));panel.append(tags);
- for(const m of w.movements){const line=node('div',null,'wod-movement');const label=w.mode==='tabata'?`BLOQUE ${m.block||w.movements.indexOf(m)+1}`:m.amount;const detail=w.mode==='tabata'?`${m.name} · 8×(20/10)`:w.mode==='emom'&&m.estimateSeconds?`${m.name} · ≈${m.estimateSeconds} s de trabajo`:m.name;line.append(node('div',label,'wod-amount'),node('div',detail,'wod-name'));panel.append(line)}
+ for(const m of w.movements){const line=node('div',null,'wod-movement');const label=w.mode==='tabata'?(w.forcedAgainstAdvice?`ESTACIÓN ${w.movements.indexOf(m)+1}`:`BLOQUE ${m.block||w.movements.indexOf(m)+1}`):m.amount;const detail=w.mode==='tabata'?(w.forcedAgainstAdvice?`${m.name} · 20 s por intervalo`: `${m.name} · 8×(20/10)`):w.mode==='emom'&&m.estimateSeconds?`${m.name} · ≈${m.estimateSeconds} s de trabajo`:m.name;line.append(node('div',label,'wod-amount'),node('div',detail,'wod-name'));panel.append(line)}
  const info=node('div',null,'wod-advice');info.append(node('b',w.advice),node('p',`Intensidad: ${w.intensity}`),node('p',`Control de interferencias: ${w.notes}`));panel.append(info);
  const actions=node('div',null,'wod-actions');actions.append(btn('Guardar WOD',()=>{if(!state.wods.some(x=>x.id===w.id))state.wods.push(w);save();renderLogWodOptions();notice('WOD guardado para registrar resultados.');},'primary'),btn('Copiar para WhatsApp',()=>copyText(formatWhatsapp(w))));
  const timer=node('a','Abrir Contador WOD (configurar reloj manualmente)','button ghost');timer.href='https://borjagrande.github.io/contador-wod/';timer.target='_blank';timer.rel='noopener noreferrer';actions.append(timer);panel.append(actions);
 }
 function renderLogWodOptions(){const select=$('log-wod');const prev=select.value;select.replaceChildren();const unique=[...(state.lastWod?[state.lastWod]:[]),...state.wods].filter((w,i,arr)=>arr.findIndex(x=>x.id===w.id)===i).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));if(!unique.length){select.append(option('','Primero genera un WOD'));return}for(const w of unique)select.append(option(w.id,`${w.date} · ${w.title} (${w.strategy})`));if(unique.some(w=>w.id===prev))select.value=prev;}
-$('generate').addEventListener('click',()=>{try{const selected=document.querySelector('input[name="strategy"]:checked').value;const d=$('wod-date').value;const wod=generateWod({state,mode:$('mode').value,strategy:selected,duration:Number($('duration').value),level:$('level').value,objective:$('objective').value,date:d});if(wod.kind==='recovery'){state.lastRecommendation=wod;state.lastWod=null;}else{state.lastWod=wod;state.lastRecommendation=null;}save();renderWod(wod);renderLogWodOptions();clearNotice();$('wod-result').scrollIntoView({behavior:'smooth',block:'start'});}catch(err){notice(err.message,'error')}});
+function getGenerateOptions(){return {mode:$('mode').value,strategy:document.querySelector('input[name="strategy"]:checked').value,duration:Number($('duration').value),level:$('level').value,objective:$('objective').value,date:$('wod-date').value};}
+function displayGenerated(wod){
+ if(wod.kind==='recovery'){state.lastRecommendation=wod;state.lastWod=null;}
+ else {state.lastWod=wod;state.lastRecommendation=null;}
+ save();renderWod(wod);renderLogWodOptions();clearNotice();
+ $('wod-result').scrollIntoView({behavior:'smooth',block:'start'});
+}
+const recoveryDialog=$('recovery-dialog');
+function askRecoveryConfirmation(options){
+ if(!options){notice('Vuelve a pulsar GENERAR WOD para evaluar la fecha y el material actuales.','warn');return;}
+ if(typeof recoveryDialog.showModal==='function')recoveryDialog.showModal();
+ else if(confirm('Se recomienda recuperación. ¿Seguro que quieres generar un WOD extra de muy baja carga?'))confirmForcedExtra();
+}
+function confirmForcedExtra(){
+ const options=pendingRecoveryOptions;
+ if(recoveryDialog.open)recoveryDialog.close();
+ if(!options)return;
+ // Recalcular sobre el estado actual (programación/material) en vez de usar
+ // un resultado anterior guardado en caché o asumir compatibilidad.
+ try{const wod=generateWod({state,...options,forceExtra:true});
+  if(wod.kind==='recovery')throw new Error('No ha sido posible generar una alternativa suficientemente conservadora.');
+  pendingRecoveryOptions=null;displayGenerated(wod);
+ }catch(err){notice(err.message,'error');}
+}
+$('recovery-no').addEventListener('click',()=>recoveryDialog.close());
+$('recovery-yes').addEventListener('click',confirmForcedExtra);
+$('generate').addEventListener('click',()=>{
+ try{
+  const options=getGenerateOptions();pendingRecoveryOptions=null;
+  const wod=generateWod({state,...options});
+  if(wod.kind==='recovery')pendingRecoveryOptions=options;
+  displayGenerated(wod);
+  if(wod.kind==='recovery')askRecoveryConfirmation(options);
+ }catch(err){notice(err.message,'error');}
+});
 function getLogWod(id){return [state.lastWod,...state.wods].find(w=>w?.id===id)}
 $('log-form').addEventListener('submit',ev=>{ev.preventDefault();const f=ev.currentTarget;const d=Object.fromEntries(new FormData(f));const w=getLogWod(d.wod);if(!w){notice('Genera un WOD antes de registrar su resultado.','error');return}if(!isISODate(d.date)||!d.result?.trim()){notice('Introducir fecha y resultado válido.','error');return}const log={id:`log-${Date.now()}`,wodId:w.id,date:d.date,title:w.title,mode:w.mode,strategy:w.strategy,patterns:w.patterns,movementsText:w.movements.map(m=>m.name).join(', '),result:d.result.trim(),weights:d.weights?.trim()||'',notes:d.notes?.trim()||'',rpe:Math.min(10,Math.max(1,Number(d.rpe)||7)),scale:d.scale,createdAt:new Date().toISOString()};state.logs.unshift(log);if(!state.wods.some(x=>x.id===w.id))state.wods.push(w);save();renderLogs();f.reset();f.elements.date.value=now();notice('Resultado guardado en el historial local.');});
 function renderLogs(){const list=$('log-list');list.replaceChildren();$('log-count').textContent=`${state.logs.length} resultados`;renderLogWodOptions();if(!state.logs.length){list.append(node('div','No has registrado resultados todavía.','empty'));return}for(const l of [...state.logs].sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,250)){const e=node('div',null,'entry');const head=node('div',null,'entry-head');head.append(node('b',`${l.date} · ${l.title}`),btn('Eliminar',()=>{if(!confirm('¿Eliminar este resultado?'))return;state.logs=state.logs.filter(x=>x.id!==l.id);save();renderLogs()},'danger-ghost small'));e.append(head,node('small',`Resultado: ${l.result} · RPE ${l.rpe}/10 · ${l.scale}\nPesos: ${l.weights||'No indicados'}${l.notes?'\nNotas: '+l.notes:''}`));list.append(e)}}

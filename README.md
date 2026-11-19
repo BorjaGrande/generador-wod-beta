@@ -109,3 +109,14 @@ La app beta utiliza la clave `generador-wod-beta-v1` y la caché `generador-wod-
 6. Comprueba la apertura offline tras completar la actualización de los archivos.
 
 **Limitación:** la asignación RPE 7 de los CSV es orientativa, no una medida real. El sistema no mide fatiga fisiológica ni lesiones y sólo evalúa la programación de CrossFit proporcionada.
+
+
+## Cambio v1.0.5 Beta — confirmación de WOD extra con interferencias
+
+- Cuando el modo **Extra inteligente** recomienda recuperación, muestra automáticamente un diálogo: «¿Seguro que quieres generar un WOD extra?». **No** conserva la recomendación sin generar entrenamiento; **Sí** genera una alternativa deliberadamente suave.
+- La confirmación es por intento: no se guarda permiso para sesiones futuras. También se puede volver a abrir desde **Generar de todos modos**.
+- La alternativa utiliza movimientos de bajo impacto y control postural/movilidad (sin necesidad de material), reduce la duración a 4–8 min según modalidad y fija RPE 2–4/10 como máximo. **No elimina el riesgo de interferencia**, sino que busca minimizarlo.
+- El WOD generado se identifica como **WOD EXTRA CON PRECAUCIÓN**, se puede guardar, copiar y registrar como otros WODs.
+- La recomendación de recuperación no es un resultado y no se guarda como WOD ejecutado. La generación libre no cambia.
+- Mismo almacenamiento: `generador-wod-beta-v1`; los perfiles de material, programación y registros anteriores se mantienen.
+- Antes de subir, exportar copia JSON. Instalar los nueve archivos, confirmar `v1.0.5 BETA` y probar el 19/11/2026 en modo inteligente, FOR TIME 15'.

@@ -55,3 +55,14 @@ input[type="date"]::-webkit-date-and-time-value {
 .wod-result.recovery{border-color:#957549;background:linear-gradient(155deg,#2a2830,#151d2b)}
 .wod-result.recovery .wod-kicker,.wod-result.recovery .wod-amount{color:var(--warn)}
 .wod-result.recovery .wod-actions{grid-template-columns:1fr}
+
+/* 1.0.5: confirmación explícita antes de generar contra la recomendación. */
+.wod-result.caution{border-color:#96724b;background:linear-gradient(155deg,#292936,#111d2d)}
+.wod-result.caution .wod-kicker,.wod-result.caution .wod-amount{color:var(--warn)}
+.button.caution-action{background:#56401f;border-color:#a5814b;color:#ffe4ac}
+#recovery-dialog{width:min(440px,calc(100vw - 32px));max-height:calc(100dvh - 40px);overflow:auto;padding:22px;background:#142237;border:1px solid #b68a55;border-radius:17px;color:var(--text);box-shadow:0 20px 60px #0009;}
+#recovery-dialog::backdrop{background:#000b}
+#recovery-dialog h2{font-size:21px;line-height:1.25;margin:0 0 12px}
+#recovery-dialog p{font-size:14px;color:var(--muted);line-height:1.55}
+#recovery-dialog .dialog-actions{display:grid;grid-template-columns:1fr;gap:10px;margin-top:18px}
+#recovery-dialog .dialog-actions .button{width:100%;min-height:50px;font-size:13px}

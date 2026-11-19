@@ -1,5 +1,5 @@
 // Generador WOD beta — motor local, independiente de la interfaz y sin servicios externos.
-export const VERSION = '1.0.4-beta';
+export const VERSION = '1.0.5-beta';
 export const EQUIPMENT_GROUPS = [
  {title:'Máquinas',items:[['airbike','Assault / Echo Bike'],['bikeerg','BikeErg'],['skierg','SkiErg'],['rowerg','RowErg / remo'],['treadmill','Cinta de correr']]},
  {title:'Pesos y cargas',items:[['db','Mancuernas (DB)'],['kb','Kettlebells (KB)'],['barbell','Barra olímpica'],['plates','Discos bumper'],['rack','Rack para sentadillas'],['sandbag','Sandbag'],['wallball','Wall Ball'],['medball','Balón medicinal']]},
@@ -266,7 +266,64 @@ function safeSmartAmount(m,mode,duration,level,stress){
  if(near)n=Math.max(4,Math.round(n*0.7));
  return `${n} reps`;
 }
-export function generateWod({state,mode='random',strategy='libre',duration=15,level='intermedio',objective='mixto',date,rng=Math.random}){
+
+// v1.0.5: alternativa deliberadamente conservadora si el usuario decide
+// generar un WOD a pesar de que la planificación aconseje recuperación.
+// Estos ejercicios de bajo impacto no requieren material adicional.
+const LOW_IMPACT_EXTRA = [
+ {id:'deadbug_easy',name:'Dead Bug alterno (controlado)',req:[],patterns:['core'],tier:1,unit:'reps'},
+ {id:'birddog_easy',name:'Bird Dog alterno (controlado)',req:[],patterns:['core'],tier:1,unit:'reps'},
+ {id:'thoracic_easy',name:'Rotaciones torácicas suaves',req:[],patterns:['mobility'],tier:1,unit:'reps'},
+ {id:'ankle_easy',name:'Movilidad de tobillo sin carga',req:[],patterns:['mobility'],tier:1,unit:'reps'},
+ {id:'breathing_easy',name:'Respiración diafragmática lenta',req:[],patterns:['breathing'],tier:1,unit:'sec'}
+];
+function chooseFrom(items,rng){return items[Math.min(items.length-1,Math.max(0,Math.floor((Number(rng())||0)*items.length)))];}
+function cautionDose(m,mode){
+ if(m.unit==='sec'||m.id==='plank')return {amount:'20 s',estimateSeconds:20};
+ if(m.id.includes('deadbug')||m.id.includes('birddog'))return {amount:'8 reps (4/4)',estimateSeconds:24};
+ if(m.id.includes('thoracic')||m.id.includes('ankle'))return {amount:'6 reps lentas (3/3)',estimateSeconds:24};
+ return {amount:'6 reps suaves',estimateSeconds:22};
+}
+function buildCautiousExtra({state,mode,date,level,objective,duration,profile,stress,assessment,rng}){
+ // Evitar patrones principales y secundarios con fatiga relevante.
+ // Si no hay material compatible, las opciones de movilidad/control no precisan equipamiento.
+ const safeBody=eligibleMovements(profile,state.skills,level).filter(m=>
+   m.tier===1&&!isLoaded(m)&&smartAllowed(m,stress)&&
+   m.patterns.every(p=>p==='core'||p==='mobility'||p==='breathing'));
+ const pool=[...LOW_IMPACT_EXTRA,...safeBody];
+ const primary=pool.filter(m=>m.patterns.includes('core'));
+ const secondary=pool.filter(m=>m.patterns.includes('mobility'));
+ if(!primary.length||!secondary.length)throw new Error('No hay movimientos de baja carga suficientes.');
+ const first=chooseFrom(primary,rng),second=chooseFrom(secondary,rng);
+ // Variar movimientos sin sustituirlos por trabajo intenso ni sobrecargar patrones.
+ const selected=Number(rng())<0.5?[first,second]:[second,first];
+ const actual=mode==='tabata'?4:mode==='emom'?Math.min(6,duration):Math.min(8,duration);
+ const rounds=mode==='fortime'?2:mode==='tabata'?8:null;
+ const movements=selected.map((m,i)=>({...m,...cautionDose(m,mode),...(mode==='tabata'?{block:1,amount:'20 s'}:{})}));
+ const title=mode==='amrap'?`AMRAP SUAVE ${actual}'`:
+  mode==='fortime'?`FOR TIME SUAVE · CAP ${actual}'`:
+  mode==='emom'?`EMOM SUAVE ${actual}'`:`TABATA ADAPTADO 4'`;
+ const advice=mode==='amrap'?`Durante ${actual} minutos alterna los dos movimientos sin buscar velocidad ni máxima cantidad de rondas. Descansa cuando lo necesites.`:
+  mode==='fortime'?`2 rondas muy suaves, sin buscar marca. Límite de ${actual} minutos; detener ante cualquier molestia.`:
+  mode==='emom'?`Alterna las dos estaciones cada minuto durante ${actual} minutos; realiza unos 20–25 s de trabajo suave y descansa el resto.`:
+  `1 bloque de 8×(20 s de movimiento controlado / 10 s de descanso), alternando los dos ejercicios, sin buscar intensidad máxima.`;
+ const active=Object.entries(stress.scores).filter(([,v])=>v>=1.9).sort((a,b)=>b[1]-a[1]).map(([p])=>PATTERN_NAMES[p]||p);
+ const notes=`GENERADO BAJO CONFIRMACIÓN pese a aconsejar recuperación. ${assessment.reason||''} `+
+  `${active.length?'Se han evitado patrones cargados: '+active.slice(0,6).join(', ')+'. ':''}`+
+  `${duration>actual?'Duración reducida de '+duration+' a '+actual+' min. ':''}`+
+  `Propuesta de muy baja carga: no garantiza ausencia de interferencias. Si hay dolor o fatiga marcada, descansar.`;
+ return {
+  id:`wod-${Date.now()}-${Math.floor(rng()*1e7)}`,kind:'wod',forcedAgainstAdvice:true,
+  date,mode,strategy:'inteligente',level,objective:'recuperación activa',requestedObjective:objective,
+  duration:actual,requestedDuration:duration,cap:actual,rounds,
+  interval:mode==='emom'?60:mode==='tabata'?30:0,
+  ...(mode==='tabata'?{tabata:{blocks:1,roundsPerBlock:8,workSeconds:20,restSeconds:10,betweenBlocksSeconds:0}}:{}),
+  title,movements,patterns:[...new Set(movements.flatMap(m=>m.patterns))],notes,advice,profileName:profile.name,
+  createdAt:new Date().toISOString(),intensity:'RPE 2–4/10 máximo'
+ };
+}
+
+export function generateWod({state,mode='random',strategy='libre',duration=15,level='intermedio',objective='mixto',date,rng=Math.random,forceExtra=false}){
  if(!isISODate(date))throw new Error('Elige una fecha válida.');
  if(!['libre','inteligente'].includes(strategy))throw new Error('Estrategia no válida.');
  if(!['principiante','intermedio','avanzado'].includes(level))throw new Error('Nivel no válido.');
@@ -281,7 +338,10 @@ export function generateWod({state,mode='random',strategy='libre',duration=15,le
  const profile=state.profiles.find(p=>p.id===state.activeProfile)||state.profiles[0];
  const stress=getStress(strategy==='inteligente'?state.plan:[],strategy==='inteligente'?state.logs:[],date);
  const assessment=strategy==='inteligente'?assessIntelligentDay(stress):null;
- if(assessment?.shouldRecover)return recoveryRecommendation(date,level,objective,stress,assessment);
+ if(assessment?.shouldRecover){
+  if(forceExtra===true)return buildCautiousExtra({state,mode,date,level,objective,duration,profile,stress,assessment,rng});
+  return recoveryRecommendation(date,level,objective,stress,assessment);
+ }
  // En días adyacentes a entrenamientos oficiales reducimos la exposición.
  const requestedDuration=duration;
  if(strategy==='inteligente'&&assessment.closeOfficial)duration=Math.min(duration,12);
@@ -336,8 +396,8 @@ export function formatWhatsapp(w){
  if(w.kind==='recovery')return `*RECUPERACIÓN RECOMENDADA* · ${w.date}\n*No se propone WOD extra con carga*\n\n${w.movements.map((m,i)=>`${i+1}. ${m.amount} · ${m.name}`).join('\n')}\n\n*Motivo:* ${w.notes}\n*Intensidad:* ${w.intensity}\n\n${w.advice}`;
 
  const names={amrap:'AMRAP',fortime:'FOR TIME',emom:'EMOM',tabata:'TABATA'};
- const header=`*WOD ${w.strategy==='inteligente'?'EXTRA INTELIGENTE':'ALEATORIO'}*\n*${w.title}* · ${w.date}\nNivel: ${w.level} · Objetivo: ${w.objective}`;
- const movements=w.movements.map((m,i)=>w.mode==='tabata'?`Bloque ${i+1}: 8×20/10 · ${m.name}`:`${i+1}. ${m.amount} ${m.name}${w.mode==='emom'&&m.estimateSeconds?` (≈${m.estimateSeconds} s)`:''}`).join('\n');
- return `${header}\n\n${movements}\n\n*Formato:* ${w.advice}\n*Intensidad:* ${w.intensity}\n*Control de interferencias:* ${w.notes}\n\nRevisar cargas y escalados antes de entrenar.`;
+ const header=`*${w.forcedAgainstAdvice?'WOD EXTRA CON PRECAUCIÓN':w.strategy==='inteligente'?'WOD EXTRA INTELIGENTE':'WOD ALEATORIO'}*\n*${w.title}* · ${w.date}\nNivel: ${w.level} · Objetivo: ${w.objective}`;
+ const movements=w.movements.map((m,i)=>w.mode==='tabata'?w.forcedAgainstAdvice?`Estación ${i+1}: 20 s · ${m.name} (alternar intervalos 20/10)`:`Bloque ${i+1}: 8×20/10 · ${m.name}`:`${i+1}. ${m.amount} ${m.name}${w.mode==='emom'&&m.estimateSeconds?` (≈${m.estimateSeconds} s)`:''}`).join('\n');
+ return `${header}${w.forcedAgainstAdvice?'\n*AVISO:* Generado por confirmación expresa pese a recomendar recuperación.':''}\n\n${movements}\n\n*Formato:* ${w.advice}\n*Intensidad:* ${w.intensity}\n*Control de interferencias:* ${w.notes}\n\nRevisar cargas y escalados antes de entrenar.`;
 }
 export function toCSV(rows,headers){const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;return [headers.join(';'),...rows.map(r=>headers.map(h=>q(r[h])).join(';'))].join('\r\n');}
