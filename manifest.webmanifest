@@ -1,0 +1,11 @@
+{
+ "name":"Generador WOD Beta",
+ "short_name":"WOD Generator",
+ "description":"Generador de WODs con material y programación de CrossFit",
+ "start_url":"./",
+ "scope":"./",
+ "display":"standalone",
+ "background_color":"#09111e",
+ "theme_color":"#09111e",
+ "icons":[{"src":"./icon-192.png","sizes":"192x192","type":"image/png","purpose":"any maskable"},{"src":"./icon-512.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}]
+}
