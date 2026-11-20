@@ -1,156 +1,55 @@
-# Generador WOD · 1.0.8 Beta
+# Generador WOD 1.0.9 Beta — Optimización estímulo/fatiga
 
-Aplicación independiente de **Contador WOD 2.2**, desarrollada como PWA para iPhone y GitHub Pages.
+Aplicación web local e instalable como PWA. **No es un entrenamiento supervisado ni garantiza ausencia de interferencias.**
 
-## Funciones
+## Actualización desde 1.0.8
 
-- Un único generador con dos estrategias: **Libre** e **Inteligente**.
-- Material configurable por perfiles, cantidades y carga máxima orientativa.
-- Catálogo de movimientos, nivel técnico y habilidades.
-- Programación oficial: importación de CSV o registro manual de sesiones.
-- Generación de AMRAP, FOR TIME, EMOM y TABATA con filtros locales.
-- Modo inteligente: exige sesiones oficiales a ±2 días, protege patrones sobrecargados y puede recomendar recuperación sin generar WOD. **No garantiza ausencia de interferencias**.
-- Guardado local de WODs y resultados, incluyendo cargas, RPE, RX/escalado y notas.
-- Exportación de registros a CSV y copia completa JSON.
-- Modo offline tras una primera apertura conectada y carga exitosa de la caché.
+1. **Exporta una copia JSON** desde Registro antes de subir la actualización.
+2. Descomprime el ZIP y sube **los 9 archivos de su raíz** al repositorio `generador-wod-beta` (sustituir los anteriores).
+3. Haz commit y abre `https://borjagrande.github.io/generador-wod-beta/` conectado a Internet.
+4. Comprueba la etiqueta **v1.0.9 BETA**. En iPhone, cierra la app por completo y reábrela si todavía muestra la versión anterior.
+5. **No desinstales la PWA ni borres los datos del sitio.** Conserva el mismo origen (URL) y clave de almacenamiento `generador-wod-beta-v1`.
 
-## Instalación en GitHub Pages
+## Controles previos
 
-1. Extrae el ZIP y sube todos los archivos, sin carpeta contenedora, a la raíz de `generador-wod-beta` en GitHub.
-2. En **Settings > Pages**, configura **Deploy from a branch**, rama `main`, carpeta `/(root)`.
-3. Abre `https://borjagrande.github.io/generador-wod-beta/` conectado a internet.
-4. Abre una segunda vez para instalar la caché, y luego usa **Compartir > Añadir a pantalla de inicio** en Safari.
-5. Sólo entonces prueba en modo avión. Los datos sólo permanecen en este navegador/dispositivo.
+Sólo para **Extra inteligente**, antes de generar:
 
-## Formato CSV de planificación
+- Fatiga: baja, **media** (por defecto) o alta.
+- Molestias: **ninguna** (por defecto), piernas, hombros/tren superior, zona lumbar o tronco.
+- Intensidad objetivo: controlado RPE 5–6, **productivo RPE 6–7** (por defecto), exigente RPE 7–8.
 
-```csv
-fecha;nombre;movimientos;rpe;notas
-2026-11-20;Ejemplo;Thrusters y Pull-ups;7;Sustituir por datos reales
-```
+El usuario puede cambiar estos valores; se guardan junto con el estado local. El modo **Libre** conserva su comportamiento anterior.
 
-La programación no se rellena automáticamente a partir de conversaciones de ChatGPT. El usuario debe importar sus sesiones reales.
+## Algoritmo nuevo
 
-## Limitaciones previstas en la beta
+- Analiza programación oficial de CrossFit importada (±2 días) y resultados registrados recientes; añade una penalización aproximada por exposición en los últimos seis días.
+- Evalúa límites de carga por patrón: cardio, core, sentadilla, piernas/impacto, bisagra/cadena posterior, tracción, empuje, overhead y agarre. Los límites cambian según fatiga, molestias, intensidad de sesiones próximas y volumen anterior **estimado por categorías**, no medido en kilogramos o tonelaje real.
+- Genera alternativas y rechaza las que superan los presupuestos, tienen volumen sin sentido, no caben en el intervalo o no alcanzan una densidad mínima plausible.
+- Puntúa alternativas: estímulo/densidad 40%, compatibilidad 25%, presupuesto de volumen 20%, diversidad 15%; elige entre las mejores. La puntuación **no es un indicador clínico de seguridad**.
+- Cuando es mejor recuperar, muestra la recomendación y **pide confirmación antes de generar contra ese consejo**, respetando los controles previos.
+- FOR TIME incluye una estimación muy aproximada del tiempo, no una predicción individual. En otras modalidades se controla trabajo por estación y ciclos esperables.
+- Si no hay opción razonable con el equipamiento, esfuerzos y restricciones declarados, **no inventa un WOD RPE 7**: sugiere recuperar, modificar parámetros o añadir material realmente disponible.
+- Se conserva el objetivo seleccionado si la mezcla de dominios lo permite; si se adapta el estímulo, lo indica claramente.
 
-- El generador es heurístico, sin conexión externa ni análisis clínico de fatiga. Las cargas y repeticiones son propuestas; verifica el peso según técnica y capacidad.
-- La lista de material y habilidades debe representar recursos y competencias reales.
-- No transfiere automáticamente una sesión ni un resultado desde o hacia Contador WOD; el botón abre el contador para configurarlo manualmente.
-- No hay sincronización entre teléfonos, ni copias en la nube; exporta JSON periódicamente.
-- No enviar datos personales a GitHub: el contenido de tu programación se guarda **sólo localmente** y no debe subirse como archivo público al repositorio.
+## Registro y preservación
 
-## Versionado
+- Se conserva `generador-wod-beta-v1` en `localStorage` y el formato de programación `fecha;nombre;movimientos;rpe;notas` (CSV UTF-8).
+- Se mantienen perfiles, inventario, habilidades, sesiones ORIGIN importadas, WODs anteriores, registros, último WOD y última recomendación. **No es necesario volver a importar ORIGIN** en el mismo navegador/origen con datos intactos.
+- Los registros nuevos incluyen fatiga y molestias previas, intensidad objetivo, recuperación al día siguiente e impacto percibido en la próxima sesión oficial (opcionales). El historial antiguo sigue siendo válido.
+- La copia JSON incluye estos nuevos datos. La restauración de copias de versiones anteriores añade valores por defecto de forma no destructiva.
 
-La app beta utiliza la clave `generador-wod-beta-v1` y la caché `generador-wod-beta-cache-v1.0.3`; no modifica el repositorio ni el almacenamiento del Contador WOD.
+## ORIGIN Strength
 
+Para las pruebas, usar las sesiones originales del Excel **PLAN 2026**:
+- Miércoles 18/11/2026 (26.97): Power/Hang Snatch + Overhead Squat; AMRAP con Power Snatch, Pull-ups y Running.
+- Viernes 20/11/2026 (26.98): DB Shoulder Press 4×8 y FOR TIME 21-15-9 DB Thruster / Burpee Over DB.
 
-## Ajuste v1.0.1 Beta — diseño en iPhone
+**No se modifica ni se reescribe ningún WOD original de ORIGIN.** El Excel sólo sirve de origen para el CSV importado por el usuario; la app no sube ni publica el archivo personal. Las fechas del documento son orientativas y el RPE 7 asignado por defecto al CSV no es RPE real de la sesión.
 
-- Los campos **Fecha del WOD** y **Perfil de material** aparecen en dos filas independientes en pantallas pequeñas para evitar que el selector de fecha se superponga al perfil.
-- Las fechas de Programación y Registro también tienen ancho completo en móvil.
-- No se modifica la lógica del generador ni la clave de almacenamiento `generador-wod-beta-v1`.
-- Se incrementa la versión de caché offline a `generador-wod-beta-cache-v1.0.3`.
-- Para actualizar: sube los nueve archivos a la raíz del mismo repositorio, conecta el iPhone a internet, abre la app y ciérrala/ábrela de nuevo para que se actualice la caché. No elimines el icono ni borres datos de Safari.
+## Límites explícitos
 
-
-## Ajuste v1.0.2 Beta — ancho del selector de fecha en Safari iOS
-
-- Corrige el desbordamiento horizontal del campo **Fecha del WOD** en iPhone detectado en la v1.0.1.
-- Mantiene Fecha del WOD y Perfil de material en filas independientes en pantallas pequeñas.
-- Ajusta la apariencia y las dimensiones del selector nativo, con contención defensiva del campo en el formulario.
-- Aplica el mismo tratamiento a los selectores de fecha de Programación y Registro.
-- No cambia la generación, inventario, historial, datos guardados ni la clave de almacenamiento `generador-wod-beta-v1`.
-- Actualiza la caché offline a `generador-wod-beta-cache-v1.0.3`.
-- Antes de actualizar, exporta una copia JSON desde **Registro → Copias de seguridad**, como medida preventiva.
-- Publicación: subir los nueve archivos descomprimidos a la raíz del repositorio `generador-wod-beta`.
-- Prueba: abrir primero en Safari **privado** para observar el diseño, después en la app instalada con conexión. Cerrar y volver a abrir la aplicación para actualizar sus recursos. **No borrar los datos del sitio ni desinstalar la app.**
-- La corrección se ha comprobado estáticamente; debe validarse en un iPhone real.
-
-
-## Cambio v1.0.3 Beta — algoritmo de generación
-
-- Equilibra patrones principales: máximo un movimiento dominante de sentadilla, bisagra de cadera u overhead por WOD, salvo que el movimiento incluya varios patrones por sí mismo.
-- El objetivo mixto busca variedad de cardio, carga y gimnasia/core cuando el material y los movimientos permitidos lo hacen posible.
-- EMOM calcula dosis aproximadas de 25–45 segundos de trabajo por estación, **no garantías de tiempo real**. No recomienda ejercicios sin dosis adecuada en el minuto.
-- AMRAP/FOR TIME ajustan repeticiones de movimientos rápidos de cardio (por ejemplo, Jumping Jacks) y moderan movimientos técnicamente exigentes.
-- TABATA clásico: 1 bloque de 8×(20/10) = 4 min. Para más tiempo usa bloques de 4 min con recuperación entre bloques cuando cabe dentro de la duración solicitada; si no cabe, indica la duración real ajustada.
-- TABATA evita movimientos técnicamente complejos o de carga pesada; restringe duración a 4–20 min.
-- Se mantienen inventario, planificación oficial, clave `generador-wod-beta-v1`, WODs guardados, registro y copia de seguridad.
-- La valoración de interferencias sigue siendo heurística; no garantiza individualización de cargas ni ausencia de fatiga.
-
-### Prueba rápida
-
-1. Exportar copia JSON desde Registro antes de actualizar.
-2. Subir los nueve archivos a la raíz de GitHub y esperar despliegue.
-3. Comprobar `v1.0.3 BETA`. Probar con DB, KB y comba, generación libre de EMOM 15', AMRAP 15' y TABATA 15'.
-4. Verificar TABATA por bloques y que el tiempo de estaciones EMOM sea orientativamente 25–45 segundos.
-5. Comprobar con modo avión, recuperación local de material y resultados anteriores.
-
-**Importante:** los descansos interbloque de TABATA no se envían automáticamente al Contador WOD 2.2, que todavía se abre para configurarlo manualmente.
-
-
-## Cambio v1.0.4 Beta — protección de WODs extra inteligentes
-
-- Si hay dos sesiones oficiales exigentes alrededor de la fecha elegida (por ejemplo, miércoles y viernes con WOD extra el jueves), el generador **puede recomendar recuperación en lugar de generar un WOD**. Esta recomendación no se guarda como WOD ejecutado.
-- Prioriza la sesión oficial posterior y considera sesiones anteriores, posteriores y resultados registrados en una ventana de hasta dos días.
-- Filtra patrones que tengan carga cercana (empuje, overhead, bisagra, agarre y otros) y considera patrones secundarios de algunos ejercicios.
-- Limita a tres rondas los FOR TIME inteligentes y modera sus repeticiones; si hay sesión oficial cercana, reduce a un máximo de 12 minutos el WOD extra y lo indica expresamente.
-- Explica en el resultado los motivos y patrones protegidos. **No promete eliminar todas las interferencias ni sustituye la evaluación individual de fatiga**.
-- El modo Libre y los cinco apartados ya existentes se mantienen. No se modifican la programación importada, los perfiles, los resultados ni la clave `generador-wod-beta-v1`. Se añade un campo opcional de recomendación a la estructura de estado.
-- Actualiza la caché a `generador-wod-beta-cache-v1.0.4`, manteniendo los nueve archivos en la raíz.
-
-### Pruebas recomendadas
-
-1. Exporta una copia JSON antes de actualizar y cierra cualquier sesión en curso.
-2. Después de subir los nueve archivos, abre la aplicación con conexión, cierra y abre de nuevo. Verifica `v1.0.4 BETA`.
-3. Con la planificación ORIGIN importada, selecciona el 2026-11-19, Extra inteligente, FOR TIME, 15 minutos, intermedio: debe recomendar recuperación, **sin mostrar 5 rondas de KB Swing + Push-ups**.
-4. Comprueba un día con una sola sesión oficial próxima, como el 2026-11-21: si propone un WOD, debe limitarlo y proteger patrones cargados; si no hay suficiente variedad segura, recomendar recuperación.
-5. Prueba Generación Libre y comprueba que inventario, programación y registros anteriores siguen visibles.
-6. Comprueba la apertura offline tras completar la actualización de los archivos.
-
-**Limitación:** la asignación RPE 7 de los CSV es orientativa, no una medida real. El sistema no mide fatiga fisiológica ni lesiones y sólo evalúa la programación de CrossFit proporcionada.
-
-
-## Cambio v1.0.5 Beta — confirmación de WOD extra con interferencias
-
-- Cuando el modo **Extra inteligente** recomienda recuperación, muestra automáticamente un diálogo: «¿Seguro que quieres generar un WOD extra?». **No** conserva la recomendación sin generar entrenamiento; **Sí** genera una alternativa deliberadamente suave.
-- La confirmación es por intento: no se guarda permiso para sesiones futuras. También se puede volver a abrir desde **Generar de todos modos**.
-- La alternativa utiliza movimientos de bajo impacto y control postural/movilidad (sin necesidad de material), reduce la duración a 4–8 min según modalidad y fija RPE 2–4/10 como máximo. **No elimina el riesgo de interferencia**, sino que busca minimizarlo.
-- El WOD generado se identifica como **WOD EXTRA CON PRECAUCIÓN**, se puede guardar, copiar y registrar como otros WODs.
-- La recomendación de recuperación no es un resultado y no se guarda como WOD ejecutado. La generación libre no cambia.
-- Mismo almacenamiento: `generador-wod-beta-v1`; los perfiles de material, programación y registros anteriores se mantienen.
-- Antes de subir, exportar copia JSON. Instalar los nueve archivos, confirmar `v1.0.5 BETA` y probar el 19/11/2026 en modo inteligente, FOR TIME 15'.
-
-
-## Cambio v1.0.6 Beta — estímulo útil con control de interferencias
-
-- Cuando la planificación aconseje recuperación se mantiene el diálogo de confirmación.
-- Al confirmar, se intenta generar un WOD de **10–12 minutos** (o bloques 20/10 hasta 14 minutos) con **RPE objetivo 5–6/10**, de forma orientativa; no se fuerza un entreno intenso.
-- Se excluyen los movimientos con patrones principales/secundarios de fatiga reciente o próxima. Se limita la complejidad y volumen, pero se intenta obtener **trabajo medible**, no únicamente movilidad.
-- Si sólo hay disponible core sin elevada fatiga, la aplicación indica *resistencia del core (objetivo adaptado)*, sin fingir que es un WOD mixto.
-- Si no hay al menos dos movimientos adecuados, se rechaza la generación y se mantiene la recomendación de recuperación.
-- Un WOD complementario no garantiza mejoras ni ausencia de interferencias: comprobar RPE real, técnica, descanso y rendimiento de la sesión oficial siguiente.
-- El formato WhatsApp, los registros, el inventario, la programación CSV y el almacenamiento `generador-wod-beta-v1` permanecen.
-- Antes de instalar, exportar copia JSON. No borrar el icono ni datos locales.
-
-
-## v1.0.7 Beta — optimización del estímulo
-
-- Conserva aviso y confirmación ante carga oficial elevada: el usuario puede elegir recuperar o solicitar un WOD con precaución.
-- El modo inteligente confirmado diferencia **restricciones estrictas** (levantamientos complejos, movimientos overhead o sentadillas exigentes cuando hay mucha fatiga prevista) y **penalización graduada** (cardio controlado, core y una carga ligera si es viable).
-- Selecciona estaciones de dominios diferentes (cardio, core, carga ligera) antes de duplicar un dominio; si sólo hay dos dominios, cambia la descripción del objetivo para no presentarlo como "mixto" cuando no corresponde.
-- Para FOR TIME, la dosis de cada ejercicio es moderada y se limita la duración a 12 minutos en fechas de alto riesgo. Los EMOM usan una estación por minuto; el tiempo cargado puede ser inferior a 25 s para limitar fatiga. TABATA conserva bloques y descansos.
-- El resultado indica "Estímulo previsto" e "Interferencia estimada", aclarando expresamente que son **heurísticas**; no son métricas clínicas ni garantizan la compatibilidad. Se recomienda RPE 5–6, peso ligero y no entrenar al fallo.
-- Los movimientos cargados no pueden inferir los kilogramos óptimos a partir del inventario: el usuario debe ajustar cargas reales. La aplicación conserva resultados, registros, programación y perfiles anteriores.
-- El modo Libre permanece sin cambios. El almacenamiento continúa en la clave `generador-wod-beta-v1` y sigue existiendo exportación JSON.
-- No borrar ni reinstalar la app para actualizar. Antes de subir, exportar copia JSON por seguridad.
-
-
-## Cambio v1.0.8 Beta — Intensidad seleccionable del WOD extra
-
-- El aviso de recuperación ofrece ahora tres niveles para el WOD generado con confirmación: **Controlado (RPE 5–6), Productivo (RPE 6–7, predeterminado) y Exigente (RPE 7–8)**.
-- Cambiar de nivel modifica la dosis y, cuando procede, la duración y el número de rondas (no solamente el texto).
-- Mantiene la exclusión de movimientos técnicamente complejos y los filtros de patrones de alta interferencia. No garantiza evitar fatiga ni preservar siempre la siguiente sesión oficial.
-- La intensidad se elige de nuevo para cada intento y se conserva en el WOD generado, pero no modifica los WODs anteriores.
-- La clave de datos `generador-wod-beta-v1` permanece; el servicio offline usa caché v1.0.8.
-- Tras actualizar, prueba el 19/11/2026 con FOR TIME 15 min y compara la opción Productivo con Exigente. Revisa el RPE real antes de utilizar las cifras para futuras decisiones.
+- Intensidad RPE estimada, no medida. El algoritmo no puede conocer la fatiga muscular real, las cargas reales de ORIGIN ni predecir daño o adaptaciones.
+- El volumen por patrón es una puntuación heurística, no un cálculo de tonelaje ni un plan de periodización completo.
+- No interpreta lesiones. Molestias relevantes exigen juicio individual y no se deben usar los WODs para entrenar con dolor.
+- El historial sólo influye si hay registros locales; no se integran automáticamente entrenamientos de otras aplicaciones.
+- Puede variar el resultado por selección aleatoria entre candidatos de calidad similar.

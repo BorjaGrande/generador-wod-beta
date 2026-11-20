@@ -1,4 +1,4 @@
-import {VERSION,EQUIPMENT_GROUPS,SKILLS,MOVEMENTS,PATTERN_NAMES,DEFAULT_STATE,sanitizeState,isISODate,daysApart,getStress,generateWod,parsePlanCSV,formatWhatsapp,toCSV} from './core.mjs';
+import {VERSION,EQUIPMENT_GROUPS,SKILLS,MOVEMENTS,PATTERN_NAMES,DEFAULT_STATE,sanitizeState,normalizeReadiness,isISODate,daysApart,getStress,generateWod,parsePlanCSV,formatWhatsapp,toCSV} from './core.mjs';
 const STORAGE_KEY='generador-wod-beta-v1';
 let pendingRecoveryOptions=null;
 const $=id=>document.getElementById(id);
@@ -6,6 +6,12 @@ const now=()=>{const t=new Date();return [t.getFullYear(),String(t.getMonth()+1)
 const node=(tag,text,klass)=>{const e=document.createElement(tag);if(text!==undefined&&text!==null)e.textContent=String(text);if(klass)e.className=klass;return e;};
 let state=DEFAULT_STATE();try{state=sanitizeState(JSON.parse(localStorage.getItem(STORAGE_KEY)));}catch{state=DEFAULT_STATE()}
 function save(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state));}catch(err){notice('No se han podido guardar los cambios. Exporta una copia y revisa el almacenamiento de Safari.','error');console.error(err)}}
+function readReadiness(){return normalizeReadiness({fatigue:$('readiness-fatigue').value,soreness:$('readiness-soreness').value,effort:$('readiness-effort').value});}
+function renderReadiness(){state.readiness=normalizeReadiness(state.readiness);$('readiness-fatigue').value=state.readiness.fatigue;$('readiness-soreness').value=state.readiness.soreness;$('readiness-effort').value=state.readiness.effort;updateReadinessVisibility();}
+function updateReadinessVisibility(){const strategy=document.querySelector('input[name="strategy"]:checked')?.value||'libre';$('readiness-panel').classList.toggle('hidden',strategy!=='inteligente');}
+for(const el of document.querySelectorAll('input[name="strategy"]'))el.addEventListener('change',updateReadinessVisibility);
+for(const id of ['readiness-fatigue','readiness-soreness','readiness-effort'])$(id).addEventListener('change',()=>{state.readiness=readReadiness();save();});
+
 function notice(message,type='success'){const el=$('notice');el.textContent=message;el.className=`notice show ${type}`;el.scrollIntoView({behavior:'auto',block:'nearest'});}
 function clearNotice(){$('notice').className='notice';$('notice').textContent=''}
 function btn(title,callback,style='ghost'){const b=node('button',title,`button ${style}`);b.type='button';b.addEventListener('click',callback);return b;}
@@ -46,12 +52,12 @@ function renderWod(w){
  if(w.forcedAgainstAdvice)panel.append(node('p','Se ha generado a petición tuya pese a recomendar recuperación. La selección busca un estímulo útil con dosis controladas. No garantiza compatibilidad: ajusta el peso y el ritmo a tus sensaciones.','wod-info')); 
  const tags=node('div');for(const t of [w.date,w.level,w.objective,w.profileName])tags.append(node('span',t,'tag'));panel.append(tags);
  for(const m of w.movements){const line=node('div',null,'wod-movement');const label=w.mode==='tabata'?(`BLOQUE ${m.block||w.movements.indexOf(m)+1}`):m.amount;const detail=w.mode==='tabata'?(`${m.name} · 8×(20/10)`):w.mode==='emom'&&m.estimateSeconds?`${m.name} · ≈${m.estimateSeconds} s de trabajo`:m.name;line.append(node('div',label,'wod-amount'),node('div',detail,'wod-name'));panel.append(line)}
- const info=node('div',null,'wod-advice');info.append(node('b',w.advice),node('p',`Intensidad: ${w.intensity}`));if(w.stimulusReport)info.append(node('p',`Estímulo previsto: ${w.stimulusReport.domains.join(' + ')}. Interferencia estimada: ${w.stimulusReport.interference}.`));info.append(node('p',`Control de interferencias: ${w.notes}`));panel.append(info);
+ const info=node('div',null,'wod-advice');info.append(node('b',w.advice),node('p',`Intensidad: ${w.intensity}`));if(w.stimulusReport){const r=w.stimulusReport;info.append(node('p',`Estímulo previsto: ${r.domains.join(' + ')}. Interferencia estimada: ${r.interference}.`));if(Number.isFinite(r.score))info.append(node('p',`Evaluación heurística: ${r.score}/100 · Uso máximo del presupuesto de carga: ${r.budgetUse}%${Number.isFinite(r.expectedMinutes)&&w.mode==='fortime'?` · Tiempo aproximado ${r.expectedMinutes} min`:''}. No equivale a seguridad o RPE real.`));}info.append(node('p',`Control de interferencias: ${w.notes}`));panel.append(info);
  const actions=node('div',null,'wod-actions');actions.append(btn('Guardar WOD',()=>{if(!state.wods.some(x=>x.id===w.id))state.wods.push(w);save();renderLogWodOptions();notice('WOD guardado para registrar resultados.');},'primary'),btn('Copiar para WhatsApp',()=>copyText(formatWhatsapp(w))));
  const timer=node('a','Abrir Contador WOD (configurar reloj manualmente)','button ghost');timer.href='https://borjagrande.github.io/contador-wod/';timer.target='_blank';timer.rel='noopener noreferrer';actions.append(timer);panel.append(actions);
 }
 function renderLogWodOptions(){const select=$('log-wod');const prev=select.value;select.replaceChildren();const unique=[...(state.lastWod?[state.lastWod]:[]),...state.wods].filter((w,i,arr)=>arr.findIndex(x=>x.id===w.id)===i).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));if(!unique.length){select.append(option('','Primero genera un WOD'));return}for(const w of unique)select.append(option(w.id,`${w.date} · ${w.title} (${w.strategy})`));if(unique.some(w=>w.id===prev))select.value=prev;}
-function getGenerateOptions(){return {mode:$('mode').value,strategy:document.querySelector('input[name="strategy"]:checked').value,duration:Number($('duration').value),level:$('level').value,objective:$('objective').value,date:$('wod-date').value};}
+function getGenerateOptions(){const readiness=readReadiness();return {mode:$('mode').value,strategy:document.querySelector('input[name="strategy"]:checked').value,duration:Number($('duration').value),level:$('level').value,objective:$('objective').value,date:$('wod-date').value,readiness,effort:readiness.effort};}
 function displayGenerated(wod){
  if(wod.kind==='recovery'){state.lastRecommendation=wod;state.lastWod=null;}
  else {state.lastWod=wod;state.lastRecommendation=null;}
@@ -61,6 +67,14 @@ function displayGenerated(wod){
 const recoveryDialog=$('recovery-dialog');
 function askRecoveryConfirmation(options){
  if(!options){notice('Vuelve a pulsar GENERAR WOD para evaluar la fecha y el material actuales.','warn');return;}
+ const current=getGenerateOptions();
+ if(['mode','strategy','duration','level','objective','date'].some(key=>current[key]!==options[key])){
+  notice('Has cambiado la configuración: vuelve a pulsar GENERAR WOD para reevaluarla.','warn');return;
+ }
+ // Los controles previos pueden cambiar tras mostrar el aviso.
+ pendingRecoveryOptions={...options,readiness:current.readiness,effort:current.effort};
+ const r=normalizeReadiness(pendingRecoveryOptions.readiness);
+ $('recovery-ready-summary').textContent=`Fatiga ${r.fatigue} · Molestias: ${r.soreness} · ${r.effort==='controlado'?'RPE 5–6':r.effort==='exigente'?'RPE 7–8':'RPE 6–7'}`;
  if(typeof recoveryDialog.showModal==='function')recoveryDialog.showModal();
  else if(confirm('La programación aconseja recuperación. ¿Quieres generar un WOD productivo (RPE objetivo 6–7) pese al consejo de recuperación?'))confirmForcedExtra();
 }
@@ -70,7 +84,7 @@ function confirmForcedExtra(){
  if(!options)return;
  // Recalcular sobre el estado actual (programación/material) en vez de usar
  // un resultado anterior guardado en caché o asumir compatibilidad.
- const effort=document.querySelector('input[name="extra-effort"]:checked')?.value||'productivo';
+ const effort=options.effort||'productivo';
  try{const wod=generateWod({state,...options,forceExtra:true,effort});
   if(wod.kind==='recovery')throw new Error('No hay una alternativa adecuada con estímulo suficiente para esta fecha.');
   pendingRecoveryOptions=null;displayGenerated(wod);
@@ -88,12 +102,12 @@ $('generate').addEventListener('click',()=>{
  }catch(err){notice(err.message,'error');}
 });
 function getLogWod(id){return [state.lastWod,...state.wods].find(w=>w?.id===id)}
-$('log-form').addEventListener('submit',ev=>{ev.preventDefault();const f=ev.currentTarget;const d=Object.fromEntries(new FormData(f));const w=getLogWod(d.wod);if(!w){notice('Genera un WOD antes de registrar su resultado.','error');return}if(!isISODate(d.date)||!d.result?.trim()){notice('Introducir fecha y resultado válido.','error');return}const log={id:`log-${Date.now()}`,wodId:w.id,date:d.date,title:w.title,mode:w.mode,strategy:w.strategy,patterns:w.patterns,movementsText:w.movements.map(m=>m.name).join(', '),result:d.result.trim(),weights:d.weights?.trim()||'',notes:d.notes?.trim()||'',rpe:Math.min(10,Math.max(1,Number(d.rpe)||7)),scale:d.scale,createdAt:new Date().toISOString()};state.logs.unshift(log);if(!state.wods.some(x=>x.id===w.id))state.wods.push(w);save();renderLogs();f.reset();f.elements.date.value=now();notice('Resultado guardado en el historial local.');});
-function renderLogs(){const list=$('log-list');list.replaceChildren();$('log-count').textContent=`${state.logs.length} resultados`;renderLogWodOptions();if(!state.logs.length){list.append(node('div','No has registrado resultados todavía.','empty'));return}for(const l of [...state.logs].sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,250)){const e=node('div',null,'entry');const head=node('div',null,'entry-head');head.append(node('b',`${l.date} · ${l.title}`),btn('Eliminar',()=>{if(!confirm('¿Eliminar este resultado?'))return;state.logs=state.logs.filter(x=>x.id!==l.id);save();renderLogs()},'danger-ghost small'));e.append(head,node('small',`Resultado: ${l.result} · RPE ${l.rpe}/10 · ${l.scale}\nPesos: ${l.weights||'No indicados'}${l.notes?'\nNotas: '+l.notes:''}`));list.append(e)}}
+$('log-form').addEventListener('submit',ev=>{ev.preventDefault();const f=ev.currentTarget;const d=Object.fromEntries(new FormData(f));const w=getLogWod(d.wod);if(!w){notice('Genera un WOD antes de registrar su resultado.','error');return}if(!isISODate(d.date)||!d.result?.trim()){notice('Introducir fecha y resultado válido.','error');return}const log={id:`log-${Date.now()}`,wodId:w.id,date:d.date,title:w.title,mode:w.mode,strategy:w.strategy,patterns:w.patterns,movementsText:w.movements.map(m=>m.name).join(', '),result:d.result.trim(),weights:d.weights?.trim()||'',notes:d.notes?.trim()||'',rpe:Math.min(10,Math.max(1,Number(d.rpe)||7)),scale:d.scale,preFatigue:w.readiness?.fatigue||'',preSoreness:w.readiness?.soreness||'',targetEffort:w.effort||'',recoveryNext:d.recoveryNext||'sin-evaluar',nextSessionImpact:d.nextSessionImpact||'sin-evaluar',createdAt:new Date().toISOString()};state.logs.unshift(log);if(!state.wods.some(x=>x.id===w.id))state.wods.push(w);save();renderLogs();f.reset();f.elements.date.value=now();notice('Resultado guardado en el historial local.');});
+function renderLogs(){const list=$('log-list');list.replaceChildren();$('log-count').textContent=`${state.logs.length} resultados`;renderLogWodOptions();if(!state.logs.length){list.append(node('div','No has registrado resultados todavía.','empty'));return}for(const l of [...state.logs].sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,250)){const e=node('div',null,'entry');const head=node('div',null,'entry-head');head.append(node('b',`${l.date} · ${l.title}`),btn('Eliminar',()=>{if(!confirm('¿Eliminar este resultado?'))return;state.logs=state.logs.filter(x=>x.id!==l.id);save();renderLogs()},'danger-ghost small'));e.append(head,node('small',`Resultado: ${l.result} · RPE ${l.rpe}/10 · ${l.scale}\nPesos: ${l.weights||'No indicados'}${l.preFatigue?'\nFatiga previa: '+l.preFatigue+' · Molestias: '+l.preSoreness:''}${l.recoveryNext&&l.recoveryNext!=='sin-evaluar'?'\nRecuperación posterior: '+l.recoveryNext:''}${l.nextSessionImpact&&l.nextSessionImpact!=='sin-evaluar'?'\nSiguiente sesión: '+l.nextSessionImpact:''}${l.notes?'\nNotas: '+l.notes:''}`));list.append(e)}}
 $('export-backup').addEventListener('click',()=>{downloadFile(`generador-wod-copia-${now()}.json`,JSON.stringify(state,null,2),'application/json');notice('Copia JSON exportada. Guárdala fuera del iPhone si es posible.');});
-$('export-logs').addEventListener('click',()=>{const headers=['date','title','mode','strategy','result','weights','rpe','scale','notes'];downloadFile(`resultados-wod-${now()}.csv`,toCSV(state.logs,headers),'text/csv;charset=utf-8');notice('Resultados exportados en CSV.');});
+$('export-logs').addEventListener('click',()=>{const headers=['date','title','mode','strategy','result','weights','rpe','scale','preFatigue','preSoreness','targetEffort','recoveryNext','nextSessionImpact','notes'];downloadFile(`resultados-wod-${now()}.csv`,toCSV(state.logs,headers),'text/csv;charset=utf-8');notice('Resultados exportados en CSV.');});
 $('restore-file').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{if(file.size>3_000_000)throw new Error('La copia supera 3 MB.');const raw=JSON.parse(await file.text());if(!raw||typeof raw!=='object'||!Array.isArray(raw.profiles)||!Array.isArray(raw.plan)||!Array.isArray(raw.logs)||!Array.isArray(raw.wods))throw new Error('Formato de copia incompatible.');if(!confirm('Esto sustituirá TODOS los perfiles, programación y resultados actuales. ¿Continuar?'))return;state=sanitizeState(raw);save();renderAll();notice('Copia restaurada.');}catch(err){notice(`No se pudo restaurar: ${err.message}`,'error')}finally{e.target.value=''}});
-function renderAll(){renderProfiles();renderInventory();renderPlan();renderWod(state.lastRecommendation||state.lastWod);renderLogs();}
+function renderAll(){renderProfiles();renderInventory();renderReadiness();renderPlan();renderWod(state.lastRecommendation||state.lastWod);renderLogs();}
 function connection(){const offline=!navigator.onLine;$('connectivity').textContent=offline?'Sin conexión · datos locales':'Con conexión · datos locales'}window.addEventListener('online',connection);window.addEventListener('offline',connection);
 const date=now();$('wod-date').value=date;$('plan-form').elements.date.value=date;$('log-form').elements.date.value=date;renderAll();connection();
 if('serviceWorker' in navigator && location.protocol==='https:')navigator.serviceWorker.register('./sw.js').catch(err=>console.warn('No se pudo activar modo offline:',err));

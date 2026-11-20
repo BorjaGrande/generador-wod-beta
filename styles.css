@@ -76,3 +76,11 @@ input[type="date"]::-webkit-date-and-time-value {
 .effort-choices span{display:flex;flex-direction:column;min-width:0;gap:3px}
 .effort-choices strong{font-size:13px}
 .effort-choices small{font-size:12px;line-height:1.4;color:var(--muted)}
+
+/* 1.0.9: controles de disponibilidad e interpretación de la carga. */
+.readiness-panel{border:1px solid #2f7065;background:#0b2028;border-radius:12px;padding:12px;margin:16px 0 4px;min-width:0}
+.readiness-panel legend{color:#91f0d0;font-size:12px;font-weight:900;letter-spacing:.5px;padding:0 5px}
+.readiness-panel .form-grid{margin-top:8px}
+.readiness-panel .hint{margin:6px 0}
+.readiness-summary{padding:10px 12px;border:1px solid #876335;border-radius:9px;background:#25251f;color:#ffe0ae;font-size:13px;font-weight:700}
+@media(max-width:470px){.readiness-panel .form-grid{grid-template-columns:1fr}.readiness-panel .form-grid label{grid-column:1/-1}}
