@@ -120,3 +120,15 @@ La app beta utiliza la clave `generador-wod-beta-v1` y la caché `generador-wod-
 - La recomendación de recuperación no es un resultado y no se guarda como WOD ejecutado. La generación libre no cambia.
 - Mismo almacenamiento: `generador-wod-beta-v1`; los perfiles de material, programación y registros anteriores se mantienen.
 - Antes de subir, exportar copia JSON. Instalar los nueve archivos, confirmar `v1.0.5 BETA` y probar el 19/11/2026 en modo inteligente, FOR TIME 15'.
+
+
+## Cambio v1.0.6 Beta — estímulo útil con control de interferencias
+
+- Cuando la planificación aconseje recuperación se mantiene el diálogo de confirmación.
+- Al confirmar, se intenta generar un WOD de **10–12 minutos** (o bloques 20/10 hasta 14 minutos) con **RPE objetivo 5–6/10**, de forma orientativa; no se fuerza un entreno intenso.
+- Se excluyen los movimientos con patrones principales/secundarios de fatiga reciente o próxima. Se limita la complejidad y volumen, pero se intenta obtener **trabajo medible**, no únicamente movilidad.
+- Si sólo hay disponible core sin elevada fatiga, la aplicación indica *resistencia del core (objetivo adaptado)*, sin fingir que es un WOD mixto.
+- Si no hay al menos dos movimientos adecuados, se rechaza la generación y se mantiene la recomendación de recuperación.
+- Un WOD complementario no garantiza mejoras ni ausencia de interferencias: comprobar RPE real, técnica, descanso y rendimiento de la sesión oficial siguiente.
+- El formato WhatsApp, los registros, el inventario, la programación CSV y el almacenamiento `generador-wod-beta-v1` permanecen.
+- Antes de instalar, exportar copia JSON. No borrar el icono ni datos locales.

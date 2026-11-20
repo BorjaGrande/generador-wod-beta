@@ -1,5 +1,5 @@
 // Generador WOD beta — motor local, independiente de la interfaz y sin servicios externos.
-export const VERSION = '1.0.5-beta';
+export const VERSION = '1.0.6-beta';
 export const EQUIPMENT_GROUPS = [
  {title:'Máquinas',items:[['airbike','Assault / Echo Bike'],['bikeerg','BikeErg'],['skierg','SkiErg'],['rowerg','RowErg / remo'],['treadmill','Cinta de correr']]},
  {title:'Pesos y cargas',items:[['db','Mancuernas (DB)'],['kb','Kettlebells (KB)'],['barbell','Barra olímpica'],['plates','Discos bumper'],['rack','Rack para sentadillas'],['sandbag','Sandbag'],['wallball','Wall Ball'],['medball','Balón medicinal']]},
@@ -113,7 +113,7 @@ function recoveryRecommendation(date,level,objective,stress,assessment){
 // Patrones auxiliares: el movimiento puede fatigar zonas adicionales aunque no
 // sean su patrón principal (ej.: hombros en swing y empujes, agarre en deadlift).
 const SECONDARY_PATTERNS={
- pushups:{overhead:0.6},burpees:{legs:0.7,overhead:0.4},
+ pushups:{overhead:0.6},plank:{push:0.65,overhead:0.5},burpees:{legs:0.7,overhead:0.4},
  kbswing:{grip:0.7,overhead:0.35},kbclean:{grip:0.8},
  dbdeadlift:{grip:0.7},dbsnatch:{grip:0.7},
  mountain:{push:0.5},dblob:{core:0.35}
@@ -267,59 +267,93 @@ function safeSmartAmount(m,mode,duration,level,stress){
  return `${n} reps`;
 }
 
-// v1.0.5: alternativa deliberadamente conservadora si el usuario decide
-// generar un WOD a pesar de que la planificación aconseje recuperación.
-// Estos ejercicios de bajo impacto no requieren material adicional.
-const LOW_IMPACT_EXTRA = [
- {id:'deadbug_easy',name:'Dead Bug alterno (controlado)',req:[],patterns:['core'],tier:1,unit:'reps'},
- {id:'birddog_easy',name:'Bird Dog alterno (controlado)',req:[],patterns:['core'],tier:1,unit:'reps'},
- {id:'thoracic_easy',name:'Rotaciones torácicas suaves',req:[],patterns:['mobility'],tier:1,unit:'reps'},
- {id:'ankle_easy',name:'Movilidad de tobillo sin carga',req:[],patterns:['mobility'],tier:1,unit:'reps'},
- {id:'breathing_easy',name:'Respiración diafragmática lenta',req:[],patterns:['breathing'],tier:1,unit:'sec'}
+// v1.0.6 — tras confirmar una advertencia, intentar generar un estímulo
+// complementario y MEDIBLE. No equivale a declarar el entrenamiento seguro.
+// Si sólo queda libre el core, cambiamos el objetivo visible y no lo vendemos
+// como un WOD mixto de capacidad cardiovascular.
+const SUPPLEMENTARY_CORE = [
+ {id:'hollowhold_extra',name:'Hollow Hold',req:[],patterns:['core'],tier:2,unit:'sec',family:'estabilidad'},
+ {id:'reversecrunch_extra',name:'Reverse Crunch controlado',req:[],patterns:['core'],tier:1,unit:'reps',family:'flexión'},
+ {id:'deadbug_extra',name:'Dead Bug contralateral',req:[],patterns:['core'],tier:1,unit:'reps',family:'control'}
 ];
-function chooseFrom(items,rng){return items[Math.min(items.length-1,Math.max(0,Math.floor((Number(rng())||0)*items.length)))];}
-function cautionDose(m,mode){
- if(m.unit==='sec'||m.id==='plank')return {amount:'20 s',estimateSeconds:20};
- if(m.id.includes('deadbug')||m.id.includes('birddog'))return {amount:'8 reps (4/4)',estimateSeconds:24};
- if(m.id.includes('thoracic')||m.id.includes('ankle'))return {amount:'6 reps lentas (3/3)',estimateSeconds:24};
- return {amount:'6 reps suaves',estimateSeconds:22};
+const CORE_FAMILY={situps:'flexión',plank:'estabilidad',hollowhold_extra:'estabilidad',reversecrunch_extra:'flexión',deadbug_extra:'control'};
+function chooseFrom(items,rng){
+ const n=Number(rng());return items[Math.max(0,Math.min(items.length-1,Math.floor((Number.isFinite(n)?n:0)*items.length)))];
 }
-function buildCautiousExtra({state,mode,date,level,objective,duration,profile,stress,assessment,rng}){
- // Evitar patrones principales y secundarios con fatiga relevante.
- // Si no hay material compatible, las opciones de movilidad/control no precisan equipamiento.
- const safeBody=eligibleMovements(profile,state.skills,level).filter(m=>
-   m.tier===1&&!isLoaded(m)&&smartAllowed(m,stress)&&
-   m.patterns.every(p=>p==='core'||p==='mobility'||p==='breathing'));
- const pool=[...LOW_IMPACT_EXTRA,...safeBody];
- const primary=pool.filter(m=>m.patterns.includes('core'));
- const secondary=pool.filter(m=>m.patterns.includes('mobility'));
- if(!primary.length||!secondary.length)throw new Error('No hay movimientos de baja carga suficientes.');
- const first=chooseFrom(primary,rng),second=chooseFrom(secondary,rng);
- // Variar movimientos sin sustituirlos por trabajo intenso ni sobrecargar patrones.
- const selected=Number(rng())<0.5?[first,second]:[second,first];
- const actual=mode==='tabata'?4:mode==='emom'?Math.min(6,duration):Math.min(8,duration);
- const rounds=mode==='fortime'?2:mode==='tabata'?8:null;
- const movements=selected.map((m,i)=>({...m,...cautionDose(m,mode),...(mode==='tabata'?{block:1,amount:'20 s'}:{})}));
- const title=mode==='amrap'?`AMRAP SUAVE ${actual}'`:
-  mode==='fortime'?`FOR TIME SUAVE · CAP ${actual}'`:
-  mode==='emom'?`EMOM SUAVE ${actual}'`:`TABATA ADAPTADO 4'`;
- const advice=mode==='amrap'?`Durante ${actual} minutos alterna los dos movimientos sin buscar velocidad ni máxima cantidad de rondas. Descansa cuando lo necesites.`:
-  mode==='fortime'?`2 rondas muy suaves, sin buscar marca. Límite de ${actual} minutos; detener ante cualquier molestia.`:
-  mode==='emom'?`Alterna las dos estaciones cada minuto durante ${actual} minutos; realiza unos 20–25 s de trabajo suave y descansa el resto.`:
-  `1 bloque de 8×(20 s de movimiento controlado / 10 s de descanso), alternando los dos ejercicios, sin buscar intensidad máxima.`;
- const active=Object.entries(stress.scores).filter(([,v])=>v>=1.9).sort((a,b)=>b[1]-a[1]).map(([p])=>PATTERN_NAMES[p]||p);
- const notes=`GENERADO BAJO CONFIRMACIÓN pese a aconsejar recuperación. ${assessment.reason||''} `+
-  `${active.length?'Se han evitado patrones cargados: '+active.slice(0,6).join(', ')+'. ':''}`+
-  `${duration>actual?'Duración reducida de '+duration+' a '+actual+' min. ':''}`+
-  `Propuesta de muy baja carga: no garantiza ausencia de interferencias. Si hay dolor o fatiga marcada, descansar.`;
+function productiveDose(m,mode,level){
+ if(mode==='tabata')return {amount:'20 s',estimateSeconds:20};
+ if(m.id==='hollowhold_extra'||m.id==='plank')return {amount:'30–35 s',estimateSeconds:33};
+ if(m.id==='deadbug_extra')return {amount:'12 reps (6/6) lentas',estimateSeconds:38};
+ if(m.id==='reversecrunch_extra')return {amount:'12 reps controladas',estimateSeconds:33};
+ if(m.id==='situps')return {amount:'14 reps',estimateSeconds:38};
+ const station=stationDose(m,level);
+ if(mode==='emom'&&station)return {amount:station.amount,estimateSeconds:station.estimate};
+ const s=makeAmount(m,mode,12,level);
+ return {amount:s,estimateSeconds:Math.max(25,Math.min(42,station?.estimate||33))};
+}
+function buildProductiveExtra({state,mode,date,level,objective,duration,profile,stress,assessment,rng}){
+ // Filtrar según material, dificultad, patrones principales/secundarios y fatiga prevista.
+ // Los ejercicios olímpicos y las cargas pesadas se excluyen en días advertidos.
+ const extra=SUPPLEMENTARY_CORE.filter(m=>level!=='principiante'||m.tier===1);
+ const candidates=[...eligibleMovements(profile,state.skills,level),...extra].filter(m=>
+   m.tier<=2 && !['deadlift','frontsquat','backsquat','powerclean','powersnatch','barthruster','pushpress','wallballs','sled','ropeclimb'].includes(m.id) &&
+   smartAllowed(m,stress) && (mode!=='tabata'||TABATA_SAFE.has(m.id)||extra.some(x=>x.id===m.id)) &&
+   (mode!=='emom'||!!stationDose(m,level)||extra.some(x=>x.id===m.id))
+ );
+ // El objetivo es priorizar un patrón relativamente libre de fatiga y no
+ // forzar otro overhead/hinge/push sólo para obtener mayor RPE.
+ const sortScore=m=>movementStress(m,stress)+(isLoaded(m)?0.8:0)+(m.patterns.length===1&&m.patterns[0]==='core'?0.05:0);
+ const safe=candidates.filter(m=>sortScore(m)<2.3).sort((a,b)=>sortScore(a)-sortScore(b));
+ const selected=[];
+ const families=new Set();
+ // Crear diversidad por familia motora (core: estabilidad, flexión y control).
+ const desired=mode==='tabata'?Math.min(3,Math.floor(duration/4)):3;
+ const shuffled=[...safe];
+ while(selected.length<desired&&shuffled.length){
+  const options=shuffled.filter(m=>!selected.some(x=>x.id===m.id));
+  if(!options.length)break;
+  const fresh=options.filter(m=>!families.has(CORE_FAMILY[m.id]||m.patterns.join('/')));
+  const pool=fresh.length?fresh:options;
+  const scores=pool.map(m=>({m,s:sortScore(m)+selected.reduce((v,o)=>v+m.patterns.filter(p=>o.patterns.includes(p)).length*.45,0)}));
+  const min=Math.min(...scores.map(o=>o.s));
+  const viable=scores.filter(o=>o.s<=min+1.2).map(o=>o.m);
+  const chosen=chooseFrom(viable,rng);
+  selected.push(chosen);
+  families.add(CORE_FAMILY[chosen.id]||chosen.patterns.join('/'));
+  shuffled.splice(shuffled.findIndex(m=>m.id===chosen.id),1);
+ }
+ // Si no hay dos estaciones razonablemente exigentes, NO disfrazar una sesión
+ // de movilidad como entrenamiento útil.
+ if(selected.length<2)throw new Error('La carga próxima no deja al menos dos ejercicios adecuados para generar un WOD extra con estímulo suficiente. Se mantiene la recomendación de recuperación.');
+ const allCore=selected.every(m=>m.patterns.every(p=>p==='core'));
+ const actual=mode==='tabata'?(duration>=14&&selected.length>=3?14:duration>=9?9:4):Math.min(duration,12);
+ const blocks=mode==='tabata'?(actual===14?3:actual===9?2:1):0;
+ const rounds=mode==='fortime'?(actual>=10?4:3):mode==='tabata'?blocks*8:null;
+ const used=mode==='tabata'?selected.slice(0,blocks):selected;
+ const movements=used.map((m,i)=>({...m,...productiveDose(m,mode,level),...(mode==='tabata'?{block:i+1}:{} )}));
+ const title=mode==='amrap'?`AMRAP COMPLEMENTARIO ${actual}'`:
+  mode==='fortime'?`FOR TIME COMPLEMENTARIO · CAP ${actual}'`:
+  mode==='emom'?`EMOM COMPLEMENTARIO ${actual}'`:`INTERVALOS 20/10 · ${actual}'`;
+ const advice=mode==='amrap'?`AMRAP de ${actual} minutos. Completa rondas con técnica controlada, manteniendo un esfuerzo moderado de verdad; evita llegar al fallo.`:
+  mode==='fortime'?`${rounds} rondas por tiempo con límite de ${actual} minutos. Mantén un ritmo sostenible; no es una prueba de máximo rendimiento.`:
+  mode==='emom'?`Una estación por minuto durante ${actual} minutos; objetivo orientativo 25–40 s de trabajo por estación. Descansa el tiempo restante.`:
+  `${blocks} ${blocks===1?'bloque':'bloques'} de 8×(20 s trabajo / 10 s descanso)${blocks>1?', con 60 s de descanso entre bloques':''}. Prioriza repeticiones controladas, no máximas.`;
+ const protectedPatterns=Object.entries(stress.scores).filter(([,v])=>v>=1.9).sort((a,b)=>b[1]-a[1]).map(([p])=>PATTERN_NAMES[p]||p);
+ const adjustedObjective=allCore?'resistencia del core (objetivo adaptado)':objective;
+ const notes=`GENERADO CON CONFIRMACIÓN pese a recomendar recuperación. ${assessment.reason||''} `+
+  `${protectedPatterns.length?'Se han evitado los patrones exigidos: '+protectedPatterns.slice(0,6).join(', ')+'. ':''}`+
+  `${allCore?'El objetivo mixto se adapta a resistencia del core para no añadir fatiga a hombros y piernas. ':''}`+
+  `${duration>actual?'Duración ajustada de '+duration+' a '+actual+' minutos. ':''}`+
+  `Registrar resultado y RPE real. Si la técnica empeora, hay dolor o persiste fatiga marcada, detener la sesión. El análisis es orientativo.`;
  return {
   id:`wod-${Date.now()}-${Math.floor(rng()*1e7)}`,kind:'wod',forcedAgainstAdvice:true,
-  date,mode,strategy:'inteligente',level,objective:'recuperación activa',requestedObjective:objective,
+  date,mode,strategy:'inteligente',level,objective:adjustedObjective,requestedObjective:objective,
   duration:actual,requestedDuration:duration,cap:actual,rounds,
   interval:mode==='emom'?60:mode==='tabata'?30:0,
-  ...(mode==='tabata'?{tabata:{blocks:1,roundsPerBlock:8,workSeconds:20,restSeconds:10,betweenBlocksSeconds:0}}:{}),
+  ...(mode==='tabata'?{tabata:{blocks,roundsPerBlock:8,workSeconds:20,restSeconds:10,betweenBlocksSeconds:blocks>1?60:0}}:{}),
   title,movements,patterns:[...new Set(movements.flatMap(m=>m.patterns))],notes,advice,profileName:profile.name,
-  createdAt:new Date().toISOString(),intensity:'RPE 2–4/10 máximo'
+  createdAt:new Date().toISOString(),intensity:'RPE 5–6/10 objetivo; no llegar al fallo',
+  progression:'Anota rondas, tiempos, RPE y técnica. Progresar sólo si la recuperación y el rendimiento oficial se mantienen.'
  };
 }
 
@@ -339,7 +373,7 @@ export function generateWod({state,mode='random',strategy='libre',duration=15,le
  const stress=getStress(strategy==='inteligente'?state.plan:[],strategy==='inteligente'?state.logs:[],date);
  const assessment=strategy==='inteligente'?assessIntelligentDay(stress):null;
  if(assessment?.shouldRecover){
-  if(forceExtra===true)return buildCautiousExtra({state,mode,date,level,objective,duration,profile,stress,assessment,rng});
+  if(forceExtra===true)return buildProductiveExtra({state,mode,date,level,objective,duration,profile,stress,assessment,rng});
   return recoveryRecommendation(date,level,objective,stress,assessment);
  }
  // En días adyacentes a entrenamientos oficiales reducimos la exposición.
@@ -397,7 +431,7 @@ export function formatWhatsapp(w){
 
  const names={amrap:'AMRAP',fortime:'FOR TIME',emom:'EMOM',tabata:'TABATA'};
  const header=`*${w.forcedAgainstAdvice?'WOD EXTRA CON PRECAUCIÓN':w.strategy==='inteligente'?'WOD EXTRA INTELIGENTE':'WOD ALEATORIO'}*\n*${w.title}* · ${w.date}\nNivel: ${w.level} · Objetivo: ${w.objective}`;
- const movements=w.movements.map((m,i)=>w.mode==='tabata'?w.forcedAgainstAdvice?`Estación ${i+1}: 20 s · ${m.name} (alternar intervalos 20/10)`:`Bloque ${i+1}: 8×20/10 · ${m.name}`:`${i+1}. ${m.amount} ${m.name}${w.mode==='emom'&&m.estimateSeconds?` (≈${m.estimateSeconds} s)`:''}`).join('\n');
+ const movements=w.movements.map((m,i)=>w.mode==='tabata'?`Bloque ${i+1}: 8×20/10 · ${m.name}`:`${i+1}. ${m.amount} ${m.name}${w.mode==='emom'&&m.estimateSeconds?` (≈${m.estimateSeconds} s)`:''}`).join('\n');
  return `${header}${w.forcedAgainstAdvice?'\n*AVISO:* Generado por confirmación expresa pese a recomendar recuperación.':''}\n\n${movements}\n\n*Formato:* ${w.advice}\n*Intensidad:* ${w.intensity}\n*Control de interferencias:* ${w.notes}\n\nRevisar cargas y escalados antes de entrenar.`;
 }
 export function toCSV(rows,headers){const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;return [headers.join(';'),...rows.map(r=>headers.map(h=>q(r[h])).join(';'))].join('\r\n');}
