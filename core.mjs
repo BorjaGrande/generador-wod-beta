@@ -1,5 +1,5 @@
 // Generador WOD beta — motor local, independiente de la interfaz y sin servicios externos.
-export const VERSION = '1.0.6-beta';
+export const VERSION = '1.0.7-beta';
 export const EQUIPMENT_GROUPS = [
  {title:'Máquinas',items:[['airbike','Assault / Echo Bike'],['bikeerg','BikeErg'],['skierg','SkiErg'],['rowerg','RowErg / remo'],['treadmill','Cinta de correr']]},
  {title:'Pesos y cargas',items:[['db','Mancuernas (DB)'],['kb','Kettlebells (KB)'],['barbell','Barra olímpica'],['plates','Discos bumper'],['rack','Rack para sentadillas'],['sandbag','Sandbag'],['wallball','Wall Ball'],['medball','Balón medicinal']]},
@@ -267,93 +267,163 @@ function safeSmartAmount(m,mode,duration,level,stress){
  return `${n} reps`;
 }
 
-// v1.0.6 — tras confirmar una advertencia, intentar generar un estímulo
-// complementario y MEDIBLE. No equivale a declarar el entrenamiento seguro.
-// Si sólo queda libre el core, cambiamos el objetivo visible y no lo vendemos
-// como un WOD mixto de capacidad cardiovascular.
+// v1.0.7: optimizar estímulo útil / coste de fatiga tras confirmar la alerta.
+// Heurística, NO predicción de recuperación ni garantía de compatibilidad.
+// Combina restricciones duras (movimientos demasiado agresivos) y penalizaciones
+// suaves (permitir trabajo dosificado cuando comparte una capacidad).
 const SUPPLEMENTARY_CORE = [
  {id:'hollowhold_extra',name:'Hollow Hold',req:[],patterns:['core'],tier:2,unit:'sec',family:'estabilidad'},
  {id:'reversecrunch_extra',name:'Reverse Crunch controlado',req:[],patterns:['core'],tier:1,unit:'reps',family:'flexión'},
  {id:'deadbug_extra',name:'Dead Bug contralateral',req:[],patterns:['core'],tier:1,unit:'reps',family:'control'}
 ];
 const CORE_FAMILY={situps:'flexión',plank:'estabilidad',hollowhold_extra:'estabilidad',reversecrunch_extra:'flexión',deadbug_extra:'control'};
+const EXTRA_COMPLEX_EXCLUDED=new Set([
+ 'deadlift','frontsquat','backsquat','powerclean','powersnatch','barthruster','pushpress',
+ 'wallballs','sled','ropeclimb','bmu','rmu','hspu','dbsnatch','dbthruster','dbpushpress','kbclean'
+]);
+const EXTRA_IMPACT=new Set(['running','shuttle','boxjumps','burpees','mountain','doubles']);
+const EXTRA_EXPLOSIVE=new Set(['kbswing','medball','sandbag']);
+const EXTRA_TABATA=new Set(['situps','deadbug_extra','reversecrunch_extra','hollowhold_extra','singles','jumping','airsquat','lunges','pushups','plank','bike','bikeerg','row','ski']);
 function chooseFrom(items,rng){
  const n=Number(rng());return items[Math.max(0,Math.min(items.length-1,Math.floor((Number.isFinite(n)?n:0)*items.length)))];
 }
-function productiveDose(m,mode,level){
+function stimulusDomain(m){
+ if(m.patterns.includes('cardio'))return 'cardio';
+ if(isLoaded(m))return 'carga';
+ if(m.patterns.includes('core'))return 'core';
+ if(m.patterns.includes('pull'))return 'traccion';
+ if(m.patterns.includes('push'))return 'empuje';
+ if(m.patterns.includes('squat'))return 'piernas';
+ return 'otro';
+}
+function extraFatigueRisk(m,stress){
+ // La fatiga cardiovascular no implica por sí misma que toda actividad aeróbica
+ // deba prohibirse. Se modula por impacto y dosis, sin ocultar el solapamiento.
+ const cardioFactor=['singles','bikeerg','bike','row','ski'].includes(m.id)?0.45:0.60;
+ let risk=0;
+ for(const p of m.patterns){
+  const factor=p==='cardio'?cardioFactor:p==='overhead'?1.25:p==='core'?0.7:p==='grip'?0.75:1;
+  risk+=(stress.scores[p]||0)*factor;
+ }
+ for(const [p,f] of Object.entries(SECONDARY_PATTERNS[m.id]||{}))risk+=(stress.scores[p]||0)*f;
+ if(isLoaded(m))risk+=0.35;
+ return risk;
+}
+function extraCandidateAllowed(m,stress,mode){
+ if(m.tier>2||EXTRA_COMPLEX_EXCLUDED.has(m.id))return false;
+ if(mode==='tabata'&&!EXTRA_TABATA.has(m.id))return false;
+ if(m.unit==='climbs')return false;
+ if((stress.scores.overhead||0)>=3.4&&(m.patterns.includes('overhead')||m.id==='plank'))return false;
+ if((stress.scores.squat||0)>=3.4&&m.patterns.includes('squat'))return false;
+ if((stress.scores.push||0)>=2.5&&(m.patterns.includes('push')||m.id==='mountain'))return false;
+ if((stress.scores.legs||0)>=3.4&&EXTRA_IMPACT.has(m.id))return false;
+ if((stress.scores.hinge||0)>=1.9&&EXTRA_EXPLOSIVE.has(m.id))return false;
+ if((stress.scores.grip||0)>=3.5&&m.patterns.includes('grip'))return false;
+ return extraFatigueRisk(m,stress)<=4.25;
+}
+function extraDose(m,mode,level,stress){
  if(mode==='tabata')return {amount:'20 s',estimateSeconds:20};
- if(m.id==='hollowhold_extra'||m.id==='plank')return {amount:'30–35 s',estimateSeconds:33};
- if(m.id==='deadbug_extra')return {amount:'12 reps (6/6) lentas',estimateSeconds:38};
+ if(m.id==='hollowhold_extra')return {amount:'25–30 s',estimateSeconds:28};
+ if(m.id==='plank')return {amount:'25–30 s',estimateSeconds:28};
+ if(m.id==='deadbug_extra')return {amount:'12 reps (6/6) controladas',estimateSeconds:35};
  if(m.id==='reversecrunch_extra')return {amount:'12 reps controladas',estimateSeconds:33};
- if(m.id==='situps')return {amount:'14 reps',estimateSeconds:38};
+ if(m.id==='situps')return {amount:'12 reps',estimateSeconds:33};
+ if(m.id==='singles')return {amount:mode==='emom'?'50 reps':'45 reps',estimateSeconds:mode==='emom'?30:27};
+ if(m.id==='jumping')return {amount:mode==='emom'?'35 reps':'30 reps',estimateSeconds:mode==='emom'?35:30};
+ if(m.id==='dbdeadlift'||m.id==='kbdeadlift')return {amount:'8 reps · carga ligera',estimateSeconds:24};
+ if(m.id==='dbcarry')return {amount:'30 m · carga moderada',estimateSeconds:30};
+ if(m.unit==='cals')return {amount:'7 cal · ritmo controlado',estimateSeconds:31};
+ if(m.id==='pushups')return {amount:'8 reps con margen',estimateSeconds:25};
+ const normal=makeAmount(m,mode,12,level);
  const station=stationDose(m,level);
- if(mode==='emom'&&station)return {amount:station.amount,estimateSeconds:station.estimate};
- const s=makeAmount(m,mode,12,level);
- return {amount:s,estimateSeconds:Math.max(25,Math.min(42,station?.estimate||33))};
+ return {amount:normal,estimateSeconds:station?.estimate||30};
+}
+function chooseStimulusCandidates(candidates,objective,stress,mode,rng){
+ const domains=objective==='cardio'?['cardio','core','carga']:
+  objective==='fuerza-resistencia'?['carga','cardio','core']:
+  objective==='gimnasia'?['core','cardio','carga']:
+  ['cardio','core','carga'];
+ // Si el modo exige un bloque por estación, respetar los bloques disponibles.
+ const target=mode==='tabata'?3:3;
+ const selected=[];
+ for(const domain of domains){
+  if(selected.length>=target)break;
+  const options=candidates.filter(m=>stimulusDomain(m)===domain&&!selected.some(x=>x.id===m.id));
+  if(!options.length)continue;
+  const sorted=options.map(m=>{
+   const risk=extraFatigueRisk(m,stress);
+   // Preferencia por trabajo medible; penalizar coste elevado sin prohibir
+   // automáticamente la capacidad aeróbica o una carga pequeña.
+   const fatigue=mode==='tabata'&&domain==='carga'?10:risk;
+   return {m,score:fatigue+Math.max(0,m.tier-1)*0.22};
+  }).sort((a,b)=>a.score-b.score);
+  const best=sorted[0].score;
+  const near=sorted.filter(x=>x.score<=best+0.55).map(x=>x.m);
+  selected.push(chooseFrom(near,rng));
+ }
+ // Si no existen tres dominios distintos, permitir segundo trabajo de core
+ // de familia diferente, pero nunca declarar que un WOD sólo de core es mixto.
+ if(selected.length<target){
+  const remaining=candidates.filter(m=>!selected.some(x=>x.id===m.id)).sort((a,b)=>extraFatigueRisk(a,stress)-extraFatigueRisk(b,stress));
+  for(const m of remaining){
+   if(selected.length>=target)break;
+   const group=stimulusDomain(m);
+   if(selected.some(x=>group==='cardio'&&stimulusDomain(x)==='cardio'))continue;
+   if(group==='core'&&selected.some(x=>stimulusDomain(x)==='core'&&(CORE_FAMILY[x.id]||'core')===(CORE_FAMILY[m.id]||'core')))continue;
+   if(group==='carga'&&selected.some(x=>stimulusDomain(x)==='carga'))continue;
+   selected.push(m);
+  }
+ }
+ return selected;
 }
 function buildProductiveExtra({state,mode,date,level,objective,duration,profile,stress,assessment,rng}){
- // Filtrar según material, dificultad, patrones principales/secundarios y fatiga prevista.
- // Los ejercicios olímpicos y las cargas pesadas se excluyen en días advertidos.
  const extra=SUPPLEMENTARY_CORE.filter(m=>level!=='principiante'||m.tier===1);
- const candidates=[...eligibleMovements(profile,state.skills,level),...extra].filter(m=>
-   m.tier<=2 && !['deadlift','frontsquat','backsquat','powerclean','powersnatch','barthruster','pushpress','wallballs','sled','ropeclimb'].includes(m.id) &&
-   smartAllowed(m,stress) && (mode!=='tabata'||TABATA_SAFE.has(m.id)||extra.some(x=>x.id===m.id)) &&
-   (mode!=='emom'||!!stationDose(m,level)||extra.some(x=>x.id===m.id))
- );
- // El objetivo es priorizar un patrón relativamente libre de fatiga y no
- // forzar otro overhead/hinge/push sólo para obtener mayor RPE.
- const sortScore=m=>movementStress(m,stress)+(isLoaded(m)?0.8:0)+(m.patterns.length===1&&m.patterns[0]==='core'?0.05:0);
- const safe=candidates.filter(m=>sortScore(m)<2.3).sort((a,b)=>sortScore(a)-sortScore(b));
- const selected=[];
- const families=new Set();
- // Crear diversidad por familia motora (core: estabilidad, flexión y control).
- const desired=mode==='tabata'?Math.min(3,Math.floor(duration/4)):3;
- const shuffled=[...safe];
- while(selected.length<desired&&shuffled.length){
-  const options=shuffled.filter(m=>!selected.some(x=>x.id===m.id));
-  if(!options.length)break;
-  const fresh=options.filter(m=>!families.has(CORE_FAMILY[m.id]||m.patterns.join('/')));
-  const pool=fresh.length?fresh:options;
-  const scores=pool.map(m=>({m,s:sortScore(m)+selected.reduce((v,o)=>v+m.patterns.filter(p=>o.patterns.includes(p)).length*.45,0)}));
-  const min=Math.min(...scores.map(o=>o.s));
-  const viable=scores.filter(o=>o.s<=min+1.2).map(o=>o.m);
-  const chosen=chooseFrom(viable,rng);
-  selected.push(chosen);
-  families.add(CORE_FAMILY[chosen.id]||chosen.patterns.join('/'));
-  shuffled.splice(shuffled.findIndex(m=>m.id===chosen.id),1);
+ const candidates=[...eligibleMovements(profile,state.skills,level),...extra].filter(m=>extraCandidateAllowed(m,stress,mode));
+ const selected=chooseStimulusCandidates(candidates,objective,stress,mode,rng);
+ const domains=[...new Set(selected.map(stimulusDomain))];
+ if(selected.length<2||domains.length<2){
+  throw new Error('No hay suficientes estímulos distintos compatibles con esta fecha, nivel y material. Es preferible mantener la recomendación de recuperación.');
  }
- // Si no hay dos estaciones razonablemente exigentes, NO disfrazar una sesión
- // de movilidad como entrenamiento útil.
- if(selected.length<2)throw new Error('La carga próxima no deja al menos dos ejercicios adecuados para generar un WOD extra con estímulo suficiente. Se mantiene la recomendación de recuperación.');
- const allCore=selected.every(m=>m.patterns.every(p=>p==='core'));
  const actual=mode==='tabata'?(duration>=14&&selected.length>=3?14:duration>=9?9:4):Math.min(duration,12);
  const blocks=mode==='tabata'?(actual===14?3:actual===9?2:1):0;
  const rounds=mode==='fortime'?(actual>=10?4:3):mode==='tabata'?blocks*8:null;
  const used=mode==='tabata'?selected.slice(0,blocks):selected;
- const movements=used.map((m,i)=>({...m,...productiveDose(m,mode,level),...(mode==='tabata'?{block:i+1}:{} )}));
+ const movements=used.map((m,i)=>({...m,...extraDose(m,mode,level,stress),...(mode==='tabata'?{block:i+1}:{})}));
+ const actualDomains=[...new Set(used.map(stimulusDomain))];
+ const actualObjective=actualDomains.includes('cardio')&&actualDomains.includes('carga')&&actualDomains.includes('core')
+  ?'mixto moderado (cardio, core y carga ligera)'
+  :actualDomains.includes('cardio')&&actualDomains.includes('core')
+  ?'acondicionamiento y core (objetivo adaptado)'
+  :actualDomains.every(x=>x==='core')?'resistencia del core (objetivo adaptado)'
+  :`${actualDomains.map(x=>({carga:'fuerza-resistencia ligera',cardio:'cardio',core:'core',traccion:'tracción',empuje:'empuje',piernas:'piernas'})[x]||x).join(' + ')} (objetivo adaptado)`;
+ const risk=movements.reduce((sum,m)=>sum+extraFatigueRisk(m,stress),0);
+ const expectedStimulus=actualDomains.join(' + ');
+ const warningRisk=risk>=6?'Moderada-alta':risk>=3.5?'Moderada':'Baja-moderada';
+ const protectedPatterns=Object.entries(stress.scores).filter(([,v])=>v>=2.3).sort((a,b)=>b[1]-a[1]).map(([p])=>PATTERN_NAMES[p]||p);
  const title=mode==='amrap'?`AMRAP COMPLEMENTARIO ${actual}'`:
   mode==='fortime'?`FOR TIME COMPLEMENTARIO · CAP ${actual}'`:
   mode==='emom'?`EMOM COMPLEMENTARIO ${actual}'`:`INTERVALOS 20/10 · ${actual}'`;
- const advice=mode==='amrap'?`AMRAP de ${actual} minutos. Completa rondas con técnica controlada, manteniendo un esfuerzo moderado de verdad; evita llegar al fallo.`:
-  mode==='fortime'?`${rounds} rondas por tiempo con límite de ${actual} minutos. Mantén un ritmo sostenible; no es una prueba de máximo rendimiento.`:
-  mode==='emom'?`Una estación por minuto durante ${actual} minutos; objetivo orientativo 25–40 s de trabajo por estación. Descansa el tiempo restante.`:
-  `${blocks} ${blocks===1?'bloque':'bloques'} de 8×(20 s trabajo / 10 s descanso)${blocks>1?', con 60 s de descanso entre bloques':''}. Prioriza repeticiones controladas, no máximas.`;
- const protectedPatterns=Object.entries(stress.scores).filter(([,v])=>v>=1.9).sort((a,b)=>b[1]-a[1]).map(([p])=>PATTERN_NAMES[p]||p);
- const adjustedObjective=allCore?'resistencia del core (objetivo adaptado)':objective;
+ const advice=mode==='amrap'?`AMRAP de ${actual} minutos: ritmo constante, pausas breves y técnica estable, sin buscar el fallo.`:
+  mode==='fortime'?`${rounds} rondas por tiempo con límite de ${actual} minutos. Mantén la técnica, no hagas un sprint inicial y conserva 2–4 repeticiones en reserva en los movimientos con carga.`:
+  mode==='emom'?`Una estación por minuto durante ${actual} min. En ejercicios cargados usa dosis algo más cortas para proteger la recuperación; descansa el resto del minuto.`:
+  `${blocks} ${blocks===1?'bloque':'bloques'} de 8×(20 s trabajo / 10 s descanso)${blocks>1?', con 60 s entre bloques':''}. Ritmo sostenible; no buscar máximas repeticiones.`;
  const notes=`GENERADO CON CONFIRMACIÓN pese a recomendar recuperación. ${assessment.reason||''} `+
-  `${protectedPatterns.length?'Se han evitado los patrones exigidos: '+protectedPatterns.slice(0,6).join(', ')+'. ':''}`+
-  `${allCore?'El objetivo mixto se adapta a resistencia del core para no añadir fatiga a hombros y piernas. ':''}`+
-  `${duration>actual?'Duración ajustada de '+duration+' a '+actual+' minutos. ':''}`+
-  `Registrar resultado y RPE real. Si la técnica empeora, hay dolor o persiste fatiga marcada, detener la sesión. El análisis es orientativo.`;
+  `Se optimiza un estímulo de ${expectedStimulus}, limitando la dosis y no prohibiendo todo movimiento compartido. `+
+  `${protectedPatterns.length?'Patrones con carga cercana: '+protectedPatterns.slice(0,5).join(', ')+'. ':''}`+
+  `${duration>actual?'Duración ajustada de '+duration+' a '+actual+' min. ':''}`+
+  `Interferencia estimada: ${warningRisk.toLowerCase()} (heurística, no medición). `+
+  `En movimientos con carga usa peso ligero y evita el fallo. Registrar resultado y RPE real; si hay dolor, empeora la técnica o persiste fatiga importante, detener la sesión. `+
+  `Los resultados de la sesión oficial siguiente prevalecen sobre esta sugerencia.`;
  return {
   id:`wod-${Date.now()}-${Math.floor(rng()*1e7)}`,kind:'wod',forcedAgainstAdvice:true,
-  date,mode,strategy:'inteligente',level,objective:adjustedObjective,requestedObjective:objective,
+  date,mode,strategy:'inteligente',level,objective:actualObjective,requestedObjective:objective,
   duration:actual,requestedDuration:duration,cap:actual,rounds,
   interval:mode==='emom'?60:mode==='tabata'?30:0,
   ...(mode==='tabata'?{tabata:{blocks,roundsPerBlock:8,workSeconds:20,restSeconds:10,betweenBlocksSeconds:blocks>1?60:0}}:{}),
   title,movements,patterns:[...new Set(movements.flatMap(m=>m.patterns))],notes,advice,profileName:profile.name,
-  createdAt:new Date().toISOString(),intensity:'RPE 5–6/10 objetivo; no llegar al fallo',
-  progression:'Anota rondas, tiempos, RPE y técnica. Progresar sólo si la recuperación y el rendimiento oficial se mantienen.'
+  createdAt:new Date().toISOString(),intensity:'RPE 5–6/10 objetivo; carga ligera, sin fallo',
+  stimulusReport:{domains:actualDomains,interference:warningRisk,advice:'Estímulo moderado con dosis controlada. Verificar sensación de fatiga y desempeño oficial posterior.'},
+  progression:'Registra tiempo/rondas, carga real, RPE y recuperación al día siguiente. La progresión requiere comparación de sesiones equivalentes.'
  };
 }
 

@@ -132,3 +132,15 @@ La app beta utiliza la clave `generador-wod-beta-v1` y la caché `generador-wod-
 - Un WOD complementario no garantiza mejoras ni ausencia de interferencias: comprobar RPE real, técnica, descanso y rendimiento de la sesión oficial siguiente.
 - El formato WhatsApp, los registros, el inventario, la programación CSV y el almacenamiento `generador-wod-beta-v1` permanecen.
 - Antes de instalar, exportar copia JSON. No borrar el icono ni datos locales.
+
+
+## v1.0.7 Beta — optimización del estímulo
+
+- Conserva aviso y confirmación ante carga oficial elevada: el usuario puede elegir recuperar o solicitar un WOD con precaución.
+- El modo inteligente confirmado diferencia **restricciones estrictas** (levantamientos complejos, movimientos overhead o sentadillas exigentes cuando hay mucha fatiga prevista) y **penalización graduada** (cardio controlado, core y una carga ligera si es viable).
+- Selecciona estaciones de dominios diferentes (cardio, core, carga ligera) antes de duplicar un dominio; si sólo hay dos dominios, cambia la descripción del objetivo para no presentarlo como "mixto" cuando no corresponde.
+- Para FOR TIME, la dosis de cada ejercicio es moderada y se limita la duración a 12 minutos en fechas de alto riesgo. Los EMOM usan una estación por minuto; el tiempo cargado puede ser inferior a 25 s para limitar fatiga. TABATA conserva bloques y descansos.
+- El resultado indica "Estímulo previsto" e "Interferencia estimada", aclarando expresamente que son **heurísticas**; no son métricas clínicas ni garantizan la compatibilidad. Se recomienda RPE 5–6, peso ligero y no entrenar al fallo.
+- Los movimientos cargados no pueden inferir los kilogramos óptimos a partir del inventario: el usuario debe ajustar cargas reales. La aplicación conserva resultados, registros, programación y perfiles anteriores.
+- El modo Libre permanece sin cambios. El almacenamiento continúa en la clave `generador-wod-beta-v1` y sigue existiendo exportación JSON.
+- No borrar ni reinstalar la app para actualizar. Antes de subir, exportar copia JSON por seguridad.

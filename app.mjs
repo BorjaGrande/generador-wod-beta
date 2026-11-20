@@ -43,10 +43,10 @@ function renderWod(w){
   return;
  }
  panel.append(node('div',w.forcedAgainstAdvice?'WOD EXTRA CON PRECAUCIÓN':w.strategy==='inteligente'?'WOD EXTRA INTELIGENTE':'WOD LIBRE','wod-kicker'),node('h2',w.title,'wod-title'));
- if(w.forcedAgainstAdvice)panel.append(node('p','Se ha generado a petición tuya pese a recomendar recuperación. Busca un estímulo moderado en patrones menos exigidos, sin intentar compensar toda la carga que ya tienes. La recuperación sigue siendo una opción.','wod-info')); 
+ if(w.forcedAgainstAdvice)panel.append(node('p','Se ha generado a petición tuya pese a recomendar recuperación. La selección busca un estímulo útil con dosis controladas. No garantiza compatibilidad: ajusta el peso y el ritmo a tus sensaciones.','wod-info')); 
  const tags=node('div');for(const t of [w.date,w.level,w.objective,w.profileName])tags.append(node('span',t,'tag'));panel.append(tags);
  for(const m of w.movements){const line=node('div',null,'wod-movement');const label=w.mode==='tabata'?(`BLOQUE ${m.block||w.movements.indexOf(m)+1}`):m.amount;const detail=w.mode==='tabata'?(`${m.name} · 8×(20/10)`):w.mode==='emom'&&m.estimateSeconds?`${m.name} · ≈${m.estimateSeconds} s de trabajo`:m.name;line.append(node('div',label,'wod-amount'),node('div',detail,'wod-name'));panel.append(line)}
- const info=node('div',null,'wod-advice');info.append(node('b',w.advice),node('p',`Intensidad: ${w.intensity}`),node('p',`Control de interferencias: ${w.notes}`));panel.append(info);
+ const info=node('div',null,'wod-advice');info.append(node('b',w.advice),node('p',`Intensidad: ${w.intensity}`));if(w.stimulusReport)info.append(node('p',`Estímulo previsto: ${w.stimulusReport.domains.join(' + ')}. Interferencia estimada: ${w.stimulusReport.interference}.`));info.append(node('p',`Control de interferencias: ${w.notes}`));panel.append(info);
  const actions=node('div',null,'wod-actions');actions.append(btn('Guardar WOD',()=>{if(!state.wods.some(x=>x.id===w.id))state.wods.push(w);save();renderLogWodOptions();notice('WOD guardado para registrar resultados.');},'primary'),btn('Copiar para WhatsApp',()=>copyText(formatWhatsapp(w))));
  const timer=node('a','Abrir Contador WOD (configurar reloj manualmente)','button ghost');timer.href='https://borjagrande.github.io/contador-wod/';timer.target='_blank';timer.rel='noopener noreferrer';actions.append(timer);panel.append(actions);
 }
@@ -62,7 +62,7 @@ const recoveryDialog=$('recovery-dialog');
 function askRecoveryConfirmation(options){
  if(!options){notice('Vuelve a pulsar GENERAR WOD para evaluar la fecha y el material actuales.','warn');return;}
  if(typeof recoveryDialog.showModal==='function')recoveryDialog.showModal();
- else if(confirm('Se recomienda recuperación. ¿Seguro que quieres generar un WOD extra con estímulo moderado y control de interferencias?'))confirmForcedExtra();
+ else if(confirm('La programación aconseja recuperación. ¿Quieres generar un WOD con estímulo útil y dosis ajustadas, sabiendo que puede añadir fatiga?'))confirmForcedExtra();
 }
 function confirmForcedExtra(){
  const options=pendingRecoveryOptions;
