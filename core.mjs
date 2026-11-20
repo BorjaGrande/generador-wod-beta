@@ -1,5 +1,5 @@
 // Generador WOD beta — motor local, independiente de la interfaz y sin servicios externos.
-export const VERSION = '1.0.7-beta';
+export const VERSION = '1.0.8-beta';
 export const EQUIPMENT_GROUPS = [
  {title:'Máquinas',items:[['airbike','Assault / Echo Bike'],['bikeerg','BikeErg'],['skierg','SkiErg'],['rowerg','RowErg / remo'],['treadmill','Cinta de correr']]},
  {title:'Pesos y cargas',items:[['db','Mancuernas (DB)'],['kb','Kettlebells (KB)'],['barbell','Barra olímpica'],['plates','Discos bumper'],['rack','Rack para sentadillas'],['sandbag','Sandbag'],['wallball','Wall Ball'],['medball','Balón medicinal']]},
@@ -321,19 +321,23 @@ function extraCandidateAllowed(m,stress,mode){
  if((stress.scores.grip||0)>=3.5&&m.patterns.includes('grip'))return false;
  return extraFatigueRisk(m,stress)<=4.25;
 }
-function extraDose(m,mode,level,stress){
+// Las tres opciones modifican dosis y tiempo, no sólo la etiqueta de RPE.
+// Son objetivos subjetivos: la respuesta real depende de la capacidad y la carga elegida.
+function extraDose(m,mode,level,stress,effort='productivo'){
+ const dose=(controlled,productive,challenging)=>effort==='exigente'?challenging:effort==='controlado'?controlled:productive;
  if(mode==='tabata')return {amount:'20 s',estimateSeconds:20};
- if(m.id==='hollowhold_extra')return {amount:'25–30 s',estimateSeconds:28};
- if(m.id==='plank')return {amount:'25–30 s',estimateSeconds:28};
- if(m.id==='deadbug_extra')return {amount:'12 reps (6/6) controladas',estimateSeconds:35};
- if(m.id==='reversecrunch_extra')return {amount:'12 reps controladas',estimateSeconds:33};
- if(m.id==='situps')return {amount:'12 reps',estimateSeconds:33};
- if(m.id==='singles')return {amount:mode==='emom'?'50 reps':'45 reps',estimateSeconds:mode==='emom'?30:27};
- if(m.id==='jumping')return {amount:mode==='emom'?'35 reps':'30 reps',estimateSeconds:mode==='emom'?35:30};
- if(m.id==='dbdeadlift'||m.id==='kbdeadlift')return {amount:'8 reps · carga ligera',estimateSeconds:24};
- if(m.id==='dbcarry')return {amount:'30 m · carga moderada',estimateSeconds:30};
- if(m.unit==='cals')return {amount:'7 cal · ritmo controlado',estimateSeconds:31};
- if(m.id==='pushups')return {amount:'8 reps con margen',estimateSeconds:25};
+ if(m.id==='hollowhold_extra')return {amount:dose('25–30 s','30–35 s','35–40 s'),estimateSeconds:dose(28,33,38)};
+ if(m.id==='plank')return {amount:dose('25–30 s','30–35 s','35–40 s'),estimateSeconds:dose(28,33,38)};
+ if(m.id==='deadbug_extra')return {amount:dose('12 reps (6/6) controladas','14 reps (7/7) controladas','16 reps (8/8) controladas'),estimateSeconds:dose(35,39,44)};
+ if(m.id==='reversecrunch_extra')return {amount:dose('12 reps controladas','14 reps controladas','16 reps controladas'),estimateSeconds:dose(33,38,43)};
+ if(m.id==='situps')return {amount:`${dose(12,14,16)} reps`,estimateSeconds:dose(33,38,43)};
+ if(m.id==='singles')return {amount:`${mode==='emom'?dose(50,60,65):dose(45,65,80)} reps`,estimateSeconds:mode==='emom'?dose(30,36,39):dose(27,39,48)};
+ if(m.id==='jumping')return {amount:`${mode==='emom'?dose(35,40,45):dose(30,40,50)} reps`,estimateSeconds:mode==='emom'?dose(35,40,45):dose(30,40,50)};
+ if(m.id==='dbdeadlift'||m.id==='kbdeadlift')return {amount:`${dose(8,10,12)} reps · ${effort==='exigente'?'carga moderada':'carga ligera'} (sin fallo)`,estimateSeconds:dose(24,30,36)};
+ if(m.id==='dbcarry')return {amount:`${dose(30,40,50)} m · carga moderada`,estimateSeconds:dose(30,38,44)};
+ if(m.unit==='cals')return {amount:`${mode==='emom'?dose(7,8,9):dose(7,9,11)} cal · ritmo ${effort==='exigente'?'vivo':'controlado'}`,estimateSeconds:mode==='emom'?dose(31,36,40):dose(31,39,45)};
+ if(m.id==='pushups')return {amount:`${dose(8,10,12)} reps con margen`,estimateSeconds:dose(25,31,37)};
+ if(m.id==='airsquat'||m.id==='lunges')return {amount:`${dose(10,12,14)} reps totales`,estimateSeconds:dose(27,32,38)};
  const normal=makeAmount(m,mode,12,level);
  const station=stationDose(m,level);
  return {amount:normal,estimateSeconds:station?.estimate||30};
@@ -376,7 +380,9 @@ function chooseStimulusCandidates(candidates,objective,stress,mode,rng){
  }
  return selected;
 }
-function buildProductiveExtra({state,mode,date,level,objective,duration,profile,stress,assessment,rng}){
+function buildProductiveExtra({state,mode,date,level,objective,duration,profile,stress,assessment,rng,effort='productivo'}){
+ const config={controlado:{maxDuration:12,rpe:'5–6',label:'Controlado'},productivo:{maxDuration:15,rpe:'6–7',label:'Productivo'},exigente:{maxDuration:15,rpe:'7–8',label:'Exigente'}}[effort];
+ if(!config)throw new Error('Intensidad de WOD extra no válida.');
  const extra=SUPPLEMENTARY_CORE.filter(m=>level!=='principiante'||m.tier===1);
  const candidates=[...eligibleMovements(profile,state.skills,level),...extra].filter(m=>extraCandidateAllowed(m,stress,mode));
  const selected=chooseStimulusCandidates(candidates,objective,stress,mode,rng);
@@ -384,19 +390,19 @@ function buildProductiveExtra({state,mode,date,level,objective,duration,profile,
  if(selected.length<2||domains.length<2){
   throw new Error('No hay suficientes estímulos distintos compatibles con esta fecha, nivel y material. Es preferible mantener la recomendación de recuperación.');
  }
- const actual=mode==='tabata'?(duration>=14&&selected.length>=3?14:duration>=9?9:4):Math.min(duration,12);
+ const actual=mode==='tabata'?(duration>=14&&selected.length>=3?14:duration>=9?9:4):Math.min(duration,config.maxDuration);
  const blocks=mode==='tabata'?(actual===14?3:actual===9?2:1):0;
- const rounds=mode==='fortime'?(actual>=10?4:3):mode==='tabata'?blocks*8:null;
+ const rounds=mode==='fortime'?(effort==='exigente'&&actual>=12?5:actual>=10?4:3):mode==='tabata'?blocks*8:null;
  const used=mode==='tabata'?selected.slice(0,blocks):selected;
- const movements=used.map((m,i)=>({...m,...extraDose(m,mode,level,stress),...(mode==='tabata'?{block:i+1}:{})}));
+ const movements=used.map((m,i)=>({...m,...extraDose(m,mode,level,stress,effort),...(mode==='tabata'?{block:i+1}:{})}));
  const actualDomains=[...new Set(used.map(stimulusDomain))];
  const actualObjective=actualDomains.includes('cardio')&&actualDomains.includes('carga')&&actualDomains.includes('core')
-  ?'mixto moderado (cardio, core y carga ligera)'
+  ?(effort==='exigente'?'mixto de acondicionamiento (cardio, core y carga moderada)':'mixto moderado (cardio, core y carga ligera)')
   :actualDomains.includes('cardio')&&actualDomains.includes('core')
   ?'acondicionamiento y core (objetivo adaptado)'
   :actualDomains.every(x=>x==='core')?'resistencia del core (objetivo adaptado)'
   :`${actualDomains.map(x=>({carga:'fuerza-resistencia ligera',cardio:'cardio',core:'core',traccion:'tracción',empuje:'empuje',piernas:'piernas'})[x]||x).join(' + ')} (objetivo adaptado)`;
- const risk=movements.reduce((sum,m)=>sum+extraFatigueRisk(m,stress),0);
+ const risk=movements.reduce((sum,m)=>sum+extraFatigueRisk(m,stress),0)*(effort==='exigente'?1.45:effort==='productivo'?1.2:1);
  const expectedStimulus=actualDomains.join(' + ');
  const warningRisk=risk>=6?'Moderada-alta':risk>=3.5?'Moderada':'Baja-moderada';
  const protectedPatterns=Object.entries(stress.scores).filter(([,v])=>v>=2.3).sort((a,b)=>b[1]-a[1]).map(([p])=>PATTERN_NAMES[p]||p);
@@ -404,15 +410,15 @@ function buildProductiveExtra({state,mode,date,level,objective,duration,profile,
   mode==='fortime'?`FOR TIME COMPLEMENTARIO · CAP ${actual}'`:
   mode==='emom'?`EMOM COMPLEMENTARIO ${actual}'`:`INTERVALOS 20/10 · ${actual}'`;
  const advice=mode==='amrap'?`AMRAP de ${actual} minutos: ritmo constante, pausas breves y técnica estable, sin buscar el fallo.`:
-  mode==='fortime'?`${rounds} rondas por tiempo con límite de ${actual} minutos. Mantén la técnica, no hagas un sprint inicial y conserva 2–4 repeticiones en reserva en los movimientos con carga.`:
+  mode==='fortime'?`${rounds} rondas por tiempo con límite de ${actual} minutos. Ritmo ${effort==='exigente'?'vivo pero sostenible':'constante'}; evita salir al sprint y conserva ${effort==='exigente'?'2–3':'2–4'} repeticiones en reserva en los movimientos con carga.`:
   mode==='emom'?`Una estación por minuto durante ${actual} min. En ejercicios cargados usa dosis algo más cortas para proteger la recuperación; descansa el resto del minuto.`:
   `${blocks} ${blocks===1?'bloque':'bloques'} de 8×(20 s trabajo / 10 s descanso)${blocks>1?', con 60 s entre bloques':''}. Ritmo sostenible; no buscar máximas repeticiones.`;
  const notes=`GENERADO CON CONFIRMACIÓN pese a recomendar recuperación. ${assessment.reason||''} `+
-  `Se optimiza un estímulo de ${expectedStimulus}, limitando la dosis y no prohibiendo todo movimiento compartido. `+
+  `Se optimiza un estímulo de ${expectedStimulus} con intensidad ${config.label.toLowerCase()} (RPE previsto ${config.rpe}), sin prohibir todo movimiento compartido. `+
   `${protectedPatterns.length?'Patrones con carga cercana: '+protectedPatterns.slice(0,5).join(', ')+'. ':''}`+
   `${duration>actual?'Duración ajustada de '+duration+' a '+actual+' min. ':''}`+
   `Interferencia estimada: ${warningRisk.toLowerCase()} (heurística, no medición). `+
-  `En movimientos con carga usa peso ligero y evita el fallo. Registrar resultado y RPE real; si hay dolor, empeora la técnica o persiste fatiga importante, detener la sesión. `+
+  `En movimientos con carga usa peso ${effort==='exigente'?'moderado sin llegar al fallo':'ligero a moderado sin llegar al fallo'}; la carga debe elegirse según sensaciones y técnica, no según el RPE anunciado. Registrar resultado y RPE real; si hay dolor, empeora la técnica o persiste fatiga importante, detener la sesión. `+
   `Los resultados de la sesión oficial siguiente prevalecen sobre esta sugerencia.`;
  return {
   id:`wod-${Date.now()}-${Math.floor(rng()*1e7)}`,kind:'wod',forcedAgainstAdvice:true,
@@ -421,13 +427,13 @@ function buildProductiveExtra({state,mode,date,level,objective,duration,profile,
   interval:mode==='emom'?60:mode==='tabata'?30:0,
   ...(mode==='tabata'?{tabata:{blocks,roundsPerBlock:8,workSeconds:20,restSeconds:10,betweenBlocksSeconds:blocks>1?60:0}}:{}),
   title,movements,patterns:[...new Set(movements.flatMap(m=>m.patterns))],notes,advice,profileName:profile.name,
-  createdAt:new Date().toISOString(),intensity:'RPE 5–6/10 objetivo; carga ligera, sin fallo',
-  stimulusReport:{domains:actualDomains,interference:warningRisk,advice:'Estímulo moderado con dosis controlada. Verificar sensación de fatiga y desempeño oficial posterior.'},
+  createdAt:new Date().toISOString(),effort,intensity:`RPE ${config.rpe}/10 objetivo (${config.label.toLowerCase()}); sin fallo. El RPE real puede diferir.`,
+  stimulusReport:{domains:actualDomains,interference:warningRisk,advice:`Estímulo ${config.label.toLowerCase()} dosificado. Verificar recuperación y rendimiento de la próxima sesión oficial.`},
   progression:'Registra tiempo/rondas, carga real, RPE y recuperación al día siguiente. La progresión requiere comparación de sesiones equivalentes.'
  };
 }
 
-export function generateWod({state,mode='random',strategy='libre',duration=15,level='intermedio',objective='mixto',date,rng=Math.random,forceExtra=false}){
+export function generateWod({state,mode='random',strategy='libre',duration=15,level='intermedio',objective='mixto',date,rng=Math.random,forceExtra=false,effort='productivo'}){
  if(!isISODate(date))throw new Error('Elige una fecha válida.');
  if(!['libre','inteligente'].includes(strategy))throw new Error('Estrategia no válida.');
  if(!['principiante','intermedio','avanzado'].includes(level))throw new Error('Nivel no válido.');
@@ -443,7 +449,7 @@ export function generateWod({state,mode='random',strategy='libre',duration=15,le
  const stress=getStress(strategy==='inteligente'?state.plan:[],strategy==='inteligente'?state.logs:[],date);
  const assessment=strategy==='inteligente'?assessIntelligentDay(stress):null;
  if(assessment?.shouldRecover){
-  if(forceExtra===true)return buildProductiveExtra({state,mode,date,level,objective,duration,profile,stress,assessment,rng});
+  if(forceExtra===true)return buildProductiveExtra({state,mode,date,level,objective,duration,profile,stress,assessment,rng,effort});
   return recoveryRecommendation(date,level,objective,stress,assessment);
  }
  // En días adyacentes a entrenamientos oficiales reducimos la exposición.

@@ -66,3 +66,13 @@ input[type="date"]::-webkit-date-and-time-value {
 #recovery-dialog p{font-size:14px;color:var(--muted);line-height:1.55}
 #recovery-dialog .dialog-actions{display:grid;grid-template-columns:1fr;gap:10px;margin-top:18px}
 #recovery-dialog .dialog-actions .button{width:100%;min-height:50px;font-size:13px}
+
+/* v1.0.8: selector explícito de intensidad para extras con advertencia */
+.effort-choices{min-width:0;margin:16px 0 8px;padding:12px;border:1px solid var(--line);border-radius:12px}
+.effort-choices legend{padding:0 6px;font-size:14px;font-weight:800;color:var(--text)}
+.effort-choices label{display:flex;align-items:flex-start;gap:10px;min-width:0;padding:10px 8px;border-radius:9px;cursor:pointer}
+.effort-choices label+label{border-top:1px solid var(--line)}
+.effort-choices input{flex:none;accent-color:#43e7b0;margin-top:4px}
+.effort-choices span{display:flex;flex-direction:column;min-width:0;gap:3px}
+.effort-choices strong{font-size:13px}
+.effort-choices small{font-size:12px;line-height:1.4;color:var(--muted)}

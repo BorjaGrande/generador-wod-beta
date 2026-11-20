@@ -62,7 +62,7 @@ const recoveryDialog=$('recovery-dialog');
 function askRecoveryConfirmation(options){
  if(!options){notice('Vuelve a pulsar GENERAR WOD para evaluar la fecha y el material actuales.','warn');return;}
  if(typeof recoveryDialog.showModal==='function')recoveryDialog.showModal();
- else if(confirm('La programación aconseja recuperación. ¿Quieres generar un WOD con estímulo útil y dosis ajustadas, sabiendo que puede añadir fatiga?'))confirmForcedExtra();
+ else if(confirm('La programación aconseja recuperación. ¿Quieres generar un WOD productivo (RPE objetivo 6–7) pese al consejo de recuperación?'))confirmForcedExtra();
 }
 function confirmForcedExtra(){
  const options=pendingRecoveryOptions;
@@ -70,7 +70,8 @@ function confirmForcedExtra(){
  if(!options)return;
  // Recalcular sobre el estado actual (programación/material) en vez de usar
  // un resultado anterior guardado en caché o asumir compatibilidad.
- try{const wod=generateWod({state,...options,forceExtra:true});
+ const effort=document.querySelector('input[name="extra-effort"]:checked')?.value||'productivo';
+ try{const wod=generateWod({state,...options,forceExtra:true,effort});
   if(wod.kind==='recovery')throw new Error('No hay una alternativa adecuada con estímulo suficiente para esta fecha.');
   pendingRecoveryOptions=null;displayGenerated(wod);
  }catch(err){notice(err.message,'error');}

@@ -1,4 +1,4 @@
-# Generador WOD · 1.0.4 Beta
+# Generador WOD · 1.0.8 Beta
 
 Aplicación independiente de **Contador WOD 2.2**, desarrollada como PWA para iPhone y GitHub Pages.
 
@@ -144,3 +144,13 @@ La app beta utiliza la clave `generador-wod-beta-v1` y la caché `generador-wod-
 - Los movimientos cargados no pueden inferir los kilogramos óptimos a partir del inventario: el usuario debe ajustar cargas reales. La aplicación conserva resultados, registros, programación y perfiles anteriores.
 - El modo Libre permanece sin cambios. El almacenamiento continúa en la clave `generador-wod-beta-v1` y sigue existiendo exportación JSON.
 - No borrar ni reinstalar la app para actualizar. Antes de subir, exportar copia JSON por seguridad.
+
+
+## Cambio v1.0.8 Beta — Intensidad seleccionable del WOD extra
+
+- El aviso de recuperación ofrece ahora tres niveles para el WOD generado con confirmación: **Controlado (RPE 5–6), Productivo (RPE 6–7, predeterminado) y Exigente (RPE 7–8)**.
+- Cambiar de nivel modifica la dosis y, cuando procede, la duración y el número de rondas (no solamente el texto).
+- Mantiene la exclusión de movimientos técnicamente complejos y los filtros de patrones de alta interferencia. No garantiza evitar fatiga ni preservar siempre la siguiente sesión oficial.
+- La intensidad se elige de nuevo para cada intento y se conserva en el WOD generado, pero no modifica los WODs anteriores.
+- La clave de datos `generador-wod-beta-v1` permanece; el servicio offline usa caché v1.0.8.
+- Tras actualizar, prueba el 19/11/2026 con FOR TIME 15 min y compara la opción Productivo con Exigente. Revisa el RPE real antes de utilizar las cifras para futuras decisiones.
