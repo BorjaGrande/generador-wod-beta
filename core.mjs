@@ -1,28 +1,29 @@
+import {OFFICIAL_MOVEMENT_CATALOG,OFFICIAL_LIBRARY_URL} from './catalog.mjs';
+export {OFFICIAL_MOVEMENT_CATALOG,OFFICIAL_LIBRARY_URL};
 // Generador WOD beta — motor local, independiente de la interfaz y sin servicios externos.
-export const VERSION = '1.0.9-beta';
+export const VERSION = '1.0.10-beta';
 export const EQUIPMENT_GROUPS = [
  {title:'Máquinas',items:[['airbike','Assault / Echo Bike'],['bikeerg','BikeErg'],['skierg','SkiErg'],['rowerg','RowErg / remo'],['treadmill','Cinta de correr']]},
- {title:'Pesos y cargas',items:[['db','Mancuernas (DB)'],['kb','Kettlebells (KB)'],['barbell','Barra olímpica'],['plates','Discos bumper'],['rack','Rack para sentadillas'],['sandbag','Sandbag'],['wallball','Wall Ball'],['medball','Balón medicinal']]},
+ {title:'Pesos y cargas',items:[['db','Mancuernas (DB)'],['kb','Kettlebells (KB)'],['barbell','Barra olímpica'],['plates','Discos bumper'],['rack','Rack para sentadillas'],['sandbag','Sandbag'],['wallball','Wall Ball'],['walltarget','Objetivo / diana para Wall Ball'],['slamball','Slam Ball'],['medball','Balón medicinal']]},
  {title:'Gimnasia y estructuras',items:[['rig','Estructura de dominadas'],['rings','Anillas'],['ropeclimb','Cuerda de trepa'],['dipbars','Paralelas / barras de fondos'],['ghd','GHD'],['wall','Pared para HSPU']]},
  {title:'Funcional y accesorios',items:[['jumprope','Comba'],['box','Cajón'],['sled','Trineo'],['bands','Bandas elásticas'],['bench','Banco'],['abmat','AbMat'],['mat','Esterilla']]},
  {title:'Espacios',items:[['run','Pista / espacio para correr'],['floor','Espacio libre para burpees'],['carry','Espacio para desplazamientos'],['outdoor','Zona exterior']]}
 ];
 export const EQUIPMENT = Object.fromEntries(EQUIPMENT_GROUPS.flatMap(group => group.items));
-export const SKILLS = [
- ['pullup','Dominadas'],['ttb','Toes to Bar'],['c2b','Chest to Bar'],['bmu','Bar Muscle-up'],['rmu','Ring Muscle-up'],['hspu','Handstand Push-up'],['rope','Rope Climb'],['du','Double Unders'],['olympic','Levantamientos olímpicos']
-];
-// req: todos los implementos indicados. patterns: estímulos prioritarios. tier: 1/2/3.
-export const MOVEMENTS = [
- ['airsquat','Air Squat',[],['squat'],1,'reps'],['lunges','Reverse Lunges',[],['squat'],1,'reps'],['burpees','Burpees',[],['push','cardio'],1,'reps'],['pushups','Push-ups',[],['push'],1,'reps'],['situps','Sit-ups',[],['core'],1,'reps'],['plank','Plank',[],['core'],1,'sec'],['mountain','Mountain Climbers',[],['core','cardio'],1,'reps'],['jumping','Jumping Jacks',[],['cardio'],1,'reps'],
- ['running','Running',['run'],['cardio','legs'],1,'meters'],['shuttle','Shuttle Runs',['carry'],['cardio','legs'],1,'meters'],
- ['dbsnatch','Alternating DB Snatch',['db'],['hinge','overhead'],2,'reps'],['dbthruster','DB Thruster',['db'],['squat','overhead'],2,'reps'],['dbdeadlift','DB Deadlift',['db'],['hinge'],1,'reps'],['dbpushpress','DB Push Press',['db'],['overhead'],2,'reps'],['dblob','DB Front Rack Lunges',['db'],['squat'],2,'reps'],['dbcarry','DB Farmer Carry',['db','carry'],['grip','core'],1,'meters'],
- ['kbswing','KB Swing',['kb'],['hinge'],2,'reps'],['kbgoblet','Goblet Squat',['kb'],['squat'],1,'reps'],['kbdeadlift','KB Deadlift',['kb'],['hinge'],1,'reps'],['kbclean','KB Clean',['kb'],['hinge','pull'],2,'reps'],
- ['deadlift','Barbell Deadlift',['barbell','plates'],['hinge'],2,'reps'],['frontsquat','Front Squat',['barbell','plates'],['squat'],2,'reps'],['backsquat','Back Squat',['barbell','plates','rack'],['squat'],2,'reps'],['powerclean','Power Clean',['barbell','plates'],['hinge','pull'],3,'reps','olympic'],['powersnatch','Power Snatch',['barbell','plates'],['hinge','overhead'],3,'reps','olympic'],['barthruster','Barbell Thruster',['barbell','plates'],['squat','overhead'],2,'reps'],['pushpress','Barbell Push Press',['barbell','plates'],['overhead'],2,'reps'],
- ['pullups','Pull-ups',['rig'],['pull','grip'],2,'reps','pullup'],['kneeraises','Hanging Knee Raises',['rig'],['core','grip'],2,'reps'],['ttb','Toes to Bar',['rig'],['core','grip'],3,'reps','ttb'],['c2b','Chest to Bar',['rig'],['pull','grip'],3,'reps','c2b'],['bmu','Bar Muscle-ups',['rig'],['pull','push','grip'],3,'reps','bmu'],['ringrows','Ring Rows',['rings'],['pull'],1,'reps'],['ringdips','Ring Dips',['rings'],['push'],2,'reps'],['rmu','Ring Muscle-ups',['rings'],['pull','push'],3,'reps','rmu'],['ropeclimb','Rope Climb',['ropeclimb'],['pull','grip'],3,'climbs','rope'],['hspu','Handstand Push-ups',['wall'],['overhead','push'],3,'reps','hspu'],
- ['singles','Single Unders',['jumprope'],['cardio'],1,'reps'],['doubles','Double Unders',['jumprope'],['cardio'],3,'reps','du'],['boxsteps','Box Step-ups',['box'],['squat'],1,'reps'],['boxjumps','Box Jumps',['box'],['squat','cardio'],2,'reps'],
- ['row','RowErg',['rowerg'],['cardio','pull'],1,'cals'],['ski','SkiErg',['skierg'],['cardio','pull'],1,'cals'],['bike','Air Bike',['airbike'],['cardio','legs'],1,'cals'],['bikeerg','BikeErg',['bikeerg'],['cardio','legs'],1,'cals'],
- ['wallballs','Wall Balls',['wallball'],['squat','overhead'],2,'reps'],['medball','Med Ball Cleans',['medball'],['hinge','squat'],2,'reps'],['sandbag','Sandbag Clean',['sandbag'],['hinge','pull'],2,'reps'],['sled','Sled Push',['sled','carry'],['legs'],2,'meters']
-].map(([id,name,req,patterns,tier,unit,skill])=>({id,name,req,patterns,tier,unit,skill:skill||null}));
+export const SKILLS = [["pullup","Dominada estricta"],["ttb","Toes-to-bar estricto"],["c2b","Chest-to-bar estricto"],["bmu","Bar Muscle-up kipping"],["rmu","Ring Muscle-up kipping"],["hspu","Kipping HSPU"],["rope","Rope Climb con pies"],["du","Double-under"],["olympic","Olímpicos (selección antigua: confirmar cada levantamiento)"],["barbell_snatch","Snatch con barra (incl. power/hang)"],["barbell_clean","Clean con barra (incl. power/hang)"],["barbell_jerk","Jerk con barra"],["overhead_squat","Overhead Squat / movilidad"],["front_rack","Front rack seguro con barra"],["db_snatch","Dumbbell Snatch"],["kb_snatch","Kettlebell Snatch"],["sdlhp","Sumo Deadlift High Pull"],["ghd_situp","GHD Sit-up"],["ghd_extension","Extensiones técnicas en GHD"],["pistol","Pistol Squat"],["kipping_pullup","Kipping Pull-up"],["butterfly_pullup","Butterfly Pull-up"],["kipping_c2b","Kipping Chest-to-bar"],["kipping_ttb","Kipping Toes-to-bar"],["knees_to_elbows","Knees-to-elbows"],["strict_hspu","HSPU estricto"],["chestwall_hspu","HSPU mirando a pared"],["deficit_hspu","HSPU con déficit"],["free_hspu","HSPU libre"],["handstand_walk","Handstand Walk"],["wall_walk","Wall Walk"],["strict_bmu","Bar Muscle-up estricto"],["strict_rmu","Ring Muscle-up estricto"],["ring_dip","Ring Dip"],["dip","Dip en paralelas"],["ring_pushup","Ring Push-up"],["legless_rope","Rope Climb sin piernas"],["l_sit","L-sit"],["ring_l_sit","L-sit en anillas"],["hanging_l_sit","L-sit colgado"],["windshield","Windshield Wiper"],["skin_the_cat","Skin the Cat"],["swing_roll","Roll en anillas"],["shoot_through","Shoot-through"],["press_handstand","Straddle Press to Handstand"],["handstand","Handstand"],["handstand_pirouette","Handstand Pirouette"],["roll_support","Forward Roll From Support"],["inverted_burpee","Inverted Burpee"],["pullover","Pull-over en barra"],["l_pullup","L Pull-up"],["toes_rings","Toes-to-rings"],["shoulder_stand","L-sit to Shoulder Stand"],["lsit_rope","L-sit Rope Climb"],["glide_kip","Glide Kip"],["db_overhead","Dumbbell Overhead Squat / Lunge"],["db_jerk","Dumbbell Push Jerk"],["turkish_getup","Dumbbell Turkish Get-up"]];
+// El generador usa exclusivamente la biblioteca curada y los movimientos WOD añadidos explícitamente.
+// No se modifica la programación ORIGIN original ni los ejercicios de WODs históricos.
+export const MOVEMENTS = OFFICIAL_MOVEMENT_CATALOG.filter(m=>m.auto);
+export function unavailableRequirements(m,profile,skills=[]){
+ const material=(m.req||[]).filter(id=>!profile?.equipment?.[id]?.enabled);
+ const technique=(m.skillsRequired||[]).filter(id=>!skills.includes(id));
+ return {material,technique};
+}
+export function canGenerateMovement(m,profile,skills=[],level='intermedio'){
+ const tiers={principiante:1,intermedio:2,avanzado:3};
+ const blocked=unavailableRequirements(m,profile,skills);
+ return !!m.auto&&m.tier<=(tiers[level]||2)&&blocked.material.length===0&&blocked.technique.length===0;
+}
 export const PATTERN_NAMES = {squat:'Piernas (sentadilla)',legs:'Piernas / carrera',hinge:'Cadena posterior',pull:'Tracción',push:'Empuje',overhead:'Hombros / overhead',grip:'Agarre',core:'Core',cardio:'Cardio'};
 // 1.0.9: parámetros opcionales compatibles con las copias de versiones anteriores.
 export const DEFAULT_READINESS = Object.freeze({fatigue:'media',soreness:'ninguna',effort:'productivo'});
@@ -142,17 +143,13 @@ function smartAllowed(m,stress){
  return true;
 }
 export function eligibleMovements(profile,skills=[],level='intermedio'){
- const tiers={principiante:1,intermedio:2,avanzado:3};const allowed=tiers[level]||2;
- return MOVEMENTS.filter(m=>m.tier<=allowed&&m.req.every(e=>profile?.equipment?.[e]?.enabled)&&(!m.skill||skills.includes(m.skill)));
+ return MOVEMENTS.filter(m=>canGenerateMovement(m,profile,skills,level));
 }
 // v1.0.3: reglas heurísticas de equilibrio, sin prometer una carga personalizada.
 const MAIN_PATTERNS=['squat','hinge','overhead'];
-const TABATA_SAFE=new Set([
- 'airsquat','lunges','burpees','pushups','situps','plank','mountain','jumping',
- 'singles','doubles','boxsteps','row','ski','bike','bikeerg'
-]);
+const TABATA_SAFE=new Set(['airsquat','burpees','pushups','absitups','situps','singles','doubles','boxsteps','row','bike','bikeerg','ski','kbswing','walkinglunge']);
 // Estimaciones aproximadas para construir estaciones de 25–45 s; no son predicciones individuales.
-const SEC_PER_REP={airsquat:1.9,lunges:2.4,burpees:4.6,pushups:2.7,situps:2.7,
+const SEC_PER_REP={absitups:2.7,ghdsitups:3.5,walkinglunge:2.4,overheadsquat:4.5,hangpowersnatch:5.0,hangpowerclean:5.0,dbfrontsquat:3.5,dbpowerclean:3.9,dbhangpowerclean:3.6,burpeebox:5.5,airsquat:1.9,lunges:2.4,burpees:4.6,pushups:2.7,situps:2.7,
  mountain:1.2,jumping:1.0,dbsnatch:3.6,dbthruster:4.2,dbdeadlift:2.8,
  dbpushpress:3.3,dblob:3.8,kbswing:2.8,kbgoblet:2.9,kbdeadlift:2.9,kbclean:3.7,
  deadlift:4.0,frontsquat:4.0,backsquat:4.2,powerclean:5.0,powersnatch:5.0,
@@ -160,7 +157,7 @@ const SEC_PER_REP={airsquat:1.9,lunges:2.4,burpees:4.6,pushups:2.7,situps:2.7,
  c2b:3.4,bmu:5.0,ringrows:3.2,ringdips:3.6,rmu:5.5,hspu:4.5,
  singles:0.6,doubles:0.8,boxsteps:3.0,boxjumps:3.5,
  wallballs:3.1,medball:3.5,sandbag:4.2};
-const LOW_REP_CAP=new Set(['deadlift','frontsquat','backsquat','powerclean','powersnatch','barthruster','pushpress','bmu','rmu','hspu']);
+const LOW_REP_CAP=new Set(['snatch','clean','cleanjerk','hangsnatch','hangpowersnatch','ghdsitups','deadlift','frontsquat','backsquat','powerclean','powersnatch','barthruster','pushpress','bmu','rmu','hspu']);
 function stationDose(m,level){
  const aim=level==='principiante'?29:level==='avanzado'?39:35;
  if(m.unit==='climbs')return null; // Ascensos no son comparables con estaciones de un minuto.
@@ -279,19 +276,17 @@ function safeSmartAmount(m,mode,duration,level,stress){
 // Heurística, NO predicción de recuperación ni garantía de compatibilidad.
 // Combina restricciones duras (movimientos demasiado agresivos) y penalizaciones
 // suaves (permitir trabajo dosificado cuando comparte una capacidad).
-const SUPPLEMENTARY_CORE = [
- {id:'hollowhold_extra',name:'Hollow Hold',req:[],patterns:['core'],tier:2,unit:'sec',family:'estabilidad'},
- {id:'reversecrunch_extra',name:'Reverse Crunch controlado',req:[],patterns:['core'],tier:1,unit:'reps',family:'flexión'},
- {id:'deadbug_extra',name:'Dead Bug contralateral',req:[],patterns:['core'],tier:1,unit:'reps',family:'control'}
-];
-const CORE_FAMILY={situps:'flexión',plank:'estabilidad',hollowhold_extra:'estabilidad',reversecrunch_extra:'flexión',deadbug_extra:'control'};
+// El núcleo suplementario de versiones previas (reverse crunch, dead bug, hollow)
+// ya NO se incorpora al pool de generación. Se preserva sólo en WODs históricos.
+const SUPPLEMENTARY_CORE = [];
+const CORE_FAMILY={situps:'flexión',absitups:'flexión',ghdsitups:'flexión',lsit:'estabilidad',ttb:'suspensión',kippingttb:'suspensión',hanglsit:'estabilidad'};
 const EXTRA_COMPLEX_EXCLUDED=new Set([
  'deadlift','frontsquat','backsquat','powerclean','powersnatch','barthruster','pushpress',
- 'wallballs','sled','ropeclimb','bmu','rmu','hspu','dbsnatch','dbthruster','dbpushpress','kbclean'
+ 'wallballs','sled','ropeclimb','bmu','rmu','hspu','dbsnatch','dbthruster','dbpushpress','ghdsitups','kbsnatch'
 ]);
 const EXTRA_IMPACT=new Set(['running','shuttle','boxjumps','burpees','mountain','doubles']);
 const EXTRA_EXPLOSIVE=new Set(['kbswing','medball','sandbag']);
-const EXTRA_TABATA=new Set(['situps','deadbug_extra','reversecrunch_extra','hollowhold_extra','singles','jumping','airsquat','lunges','pushups','plank','bike','bikeerg','row','ski']);
+const EXTRA_TABATA=new Set(['absitups','situps','singles','airsquat','pushups','bike','bikeerg','row','ski','walkinglunge','boxsteps']);
 function chooseFrom(items,rng){
  const n=Number(rng());return items[Math.max(0,Math.min(items.length-1,Math.floor((Number.isFinite(n)?n:0)*items.length)))];
 }
@@ -310,7 +305,7 @@ function extraFatigueRisk(m,stress){
  const cardioFactor=['singles','bikeerg','bike','row','ski'].includes(m.id)?0.45:0.60;
  let risk=0;
  for(const p of m.patterns){
-  const factor=p==='cardio'?cardioFactor:p==='overhead'?1.25:p==='core'?0.7:p==='grip'?0.75:1;
+  const factor=p==='cardio'?cardioFactor:p==='legs'&&['singles','bike','bikeerg'].includes(m.id)?0.28:p==='legs'&&m.id==='row'?0.55:p==='overhead'?1.25:p==='core'?0.7:p==='grip'?0.75:1;
   risk+=(stress.scores[p]||0)*factor;
  }
  for(const [p,f] of Object.entries(SECONDARY_PATTERNS[m.id]||{}))risk+=(stress.scores[p]||0)*f;
@@ -338,7 +333,7 @@ function extraDose(m,mode,level,stress,effort='productivo'){
  if(m.id==='plank')return {amount:dose('25–30 s','30–35 s','35–40 s'),estimateSeconds:dose(28,33,38)};
  if(m.id==='deadbug_extra')return {amount:dose('12 reps (6/6) controladas','14 reps (7/7) controladas','16 reps (8/8) controladas'),estimateSeconds:dose(35,39,44)};
  if(m.id==='reversecrunch_extra')return {amount:dose('12 reps controladas','14 reps controladas','16 reps controladas'),estimateSeconds:dose(33,38,43)};
- if(m.id==='situps')return {amount:`${dose(12,14,16)} reps`,estimateSeconds:dose(33,38,43)};
+ if(m.id==='absitups'||m.id==='situps')return {amount:`${dose(12,14,16)} reps`,estimateSeconds:dose(33,38,43)};
  if(m.id==='singles')return {amount:`${mode==='emom'?dose(50,60,65):dose(45,65,80)} reps`,estimateSeconds:mode==='emom'?dose(30,36,39):dose(27,39,48)};
  if(m.id==='jumping')return {amount:`${mode==='emom'?dose(35,40,45):dose(30,40,50)} reps`,estimateSeconds:mode==='emom'?dose(35,40,45):dose(30,40,50)};
  if(m.id==='dbdeadlift'||m.id==='kbdeadlift')return {amount:`${dose(8,10,12)} reps · ${effort==='exigente'?'carga moderada':'carga ligera'} (sin fallo)`,estimateSeconds:dose(24,30,36)};
@@ -394,7 +389,7 @@ function chooseStimulusCandidates(candidates,objective,stress,mode,rng){
 const BASE_PATTERN_BUDGET={cardio:21,core:12,squat:10,legs:12,hinge:11,pull:10,push:9,overhead:7,grip:10};
 const MOVEMENT_UNIT_COST={
  singles:0.015,jumping:0.016,deadbug_extra:0.105,reversecrunch_extra:0.13,
- hollowhold_extra:0.070,plank:0.064,situps:0.135,
+ hollowhold_extra:0.070,plank:0.064,situps:0.135,absitups:0.135,ghdsitups:0.22,
  kbdeadlift:0.28,dbdeadlift:0.28,dbcarry:0.047,
  pushups:0.32,airsquat:0.20,lunges:0.25,
  bike:0.33,bikeerg:0.33,row:0.35,ski:0.35,
@@ -530,7 +525,7 @@ function evaluate109(selected,{state,date,stress,assessment,readiness,mode,durat
  const cardio=movements.some(m=>m.patterns.includes('cardio'));
  const workFraction=mode==='fortime'?metrics.elapsedSeconds/(duration*60):mode==='emom'?metrics.activeSeconds/(duration*60):mode==='tabata'?.666:Math.min(0.9,metrics.activeSeconds/(duration*60));
  if(workFraction<0.53||mode!=='tabata'&&!cardio&&domains.length<3)return null;
- if(mode!=='tabata'&&movements.some(m=>(['situps','deadbug_extra','reversecrunch_extra'].includes(m.id)&&m.units<10)||(m.id==='singles'&&m.units<40)||(m.id==='jumping'&&m.units<30)))return null;
+ if(mode!=='tabata'&&movements.some(m=>(['situps','absitups','ghdsitups'].includes(m.id)&&m.units<10)||(m.id==='singles'&&m.units<40)||(m.id==='jumping'&&m.units<30)))return null;
  const volumeRatio=Math.max(0,...ratios);
  const overlapCost=movements.reduce((n,m)=>n+extraFatigueRisk(m,stress),0)/movements.length;
  const stimulus=clamp(100-145*Math.abs(workFraction-0.77)+(movements.some(m=>m.id==='singles')?5:0)-(movements.some(m=>m.id==='jumping')?5:0),0,100);
@@ -568,7 +563,7 @@ function buildOptimizedExtra({state,mode,date,level,objective,duration,profile,s
  const blocks=mode==='tabata'?(clipped===14?3:clipped===9?2:1):0;
  const templates=objective==='cardio'?[['cardio','core','cardio'],['cardio','cardio','core'],['cardio','core','carga']]:
   objective==='fuerza-resistencia'?[['carga','cardio','core'],['cardio','core','carga'],['cardio','core','empuje']]:
-  [['cardio','core','carga'],['cardio','core','piernas'],['cardio','core','traccion'],['cardio','core','empuje'],['cardio','core','cardio'],['cardio','core']];
+  [['cardio','core','carga'],['cardio','core','piernas'],['cardio','core','traccion'],['cardio','core','empuje'],['cardio','core','cardio'],['cardio','core'],['cardio','carga'],['cardio','cardio']];
  const candidates=[];
  for(let i=0;i<180;i++){
   const template=templates[i%templates.length];

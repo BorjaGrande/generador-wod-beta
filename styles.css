@@ -84,3 +84,20 @@ input[type="date"]::-webkit-date-and-time-value {
 .readiness-panel .hint{margin:6px 0}
 .readiness-summary{padding:10px 12px;border:1px solid #876335;border-radius:9px;background:#25251f;color:#ffe0ae;font-size:13px;font-weight:700}
 @media(max-width:470px){.readiness-panel .form-grid{grid-template-columns:1fr}.readiness-panel .form-grid label{grid-column:1/-1}}
+
+/* v1.0.10 — fichas oficiales, compactas en iPhone */
+.movement-catalog{display:grid;gap:8px;margin-top:10px}
+.movement-catalog-card{border:1px solid rgba(145,160,180,.25);border-radius:12px;padding:10px 12px;background:rgba(11,22,38,.36)}
+.movement-catalog-card summary{cursor:pointer;list-style:disclosure-closed;display:flex;align-items:center;justify-content:space-between;gap:9px}
+.movement-catalog-card[open] summary{margin-bottom:8px}
+.catalog-name{font-size:14px;font-weight:650}
+.catalog-status{font-size:11px;color:#dba29b;white-space:nowrap}
+.catalog-status.is-ready{color:#86d8b7}
+.catalog-body{font-size:13px;line-height:1.4;word-break:break-word}
+.catalog-body p{margin:6px 0}
+a.catalog-official{font-size:12px;color:#94c9ff;text-decoration:underline;display:inline-block;margin-top:6px}
+.wod-movement a.catalog-official{display:block;margin-left:5px;margin-bottom:4px}
+
+.skill-category{border:1px solid rgba(145,160,180,.22);border-radius:11px;margin-bottom:7px;padding:10px}
+.skill-category>summary{cursor:pointer;font-weight:650;font-size:14px}
+.skill-category>.check-grid{padding-top:12px}

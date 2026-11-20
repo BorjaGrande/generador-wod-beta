@@ -18,7 +18,7 @@
 <div class="shell">
   <header class="site-header">
     <div class="brand"><span class="brand-glyph" aria-hidden="true">W</span><div><span class="eyebrow">CROSSFIT · HERRAMIENTAS</span><h1>GENERADOR WOD</h1></div></div>
-    <span class="version">v1.0.9 BETA</span>
+    <span class="version">v1.0.10 BETA</span>
   </header>
   <div id="notice" class="notice" role="status" aria-live="polite"></div>
   <nav class="tabs" aria-label="Secciones">
@@ -71,7 +71,13 @@
         <p class="hint">Marca solamente el material disponible en este perfil. Los ejercicios de gimnasia se habilitan aparte, según tu nivel técnico.</p>
         <div id="equipment-groups"></div>
       </div>
-      <div class="panel"><h3>Habilidades técnicas disponibles</h3><p class="hint">Tener una estructura o anillas no implica dominar todos los movimientos.</p><div id="skill-options" class="check-grid"></div></div>
+      <div class="panel"><h3>Habilidades técnicas disponibles</h3><p class="hint">Tener una estructura o anillas no implica dominar todos los movimientos.</p><div id="skill-options" class="check-grid"></div><p class="hint">Las habilidades anteriores se conservan. El antiguo selector general de olímpicos no habilita automáticamente Snatch, Clean ni Jerk: marca cada una por separado.</p></div>
+      <div class="panel"><h3>Biblioteca de movimientos CrossFit</h3><p class="hint">Catálogo contrastado con la biblioteca de CrossFit. Se generan solo ejercicios compatibles con el perfil de material, nivel y habilidades adquiridas. Abre cada ficha para consultar requisitos y ejecución.</p>
+        <div class="form-grid"><label>Buscar ejercicio<input id="catalog-search" type="search" placeholder="Ej.: snatch, GHD, dominada" /></label>
+        <label>Mostrar<select id="catalog-filter"><option value="all">Todos</option><option value="ready">Disponibles</option><option value="blocked">Bloqueados</option><option value="reference">Solo referencia técnica</option></select></label></div>
+        <p id="catalog-count" class="hint"></p><div id="movement-catalog" class="movement-catalog"></div>
+        <p class="hint">Fuente: <a href="https://www.crossfit.com/crossfit-movements" target="_blank" rel="noopener noreferrer">Biblioteca oficial de CrossFit</a>. Las indicaciones breves son resúmenes editoriales; utiliza los vídeos y la enseñanza de un entrenador para aprender nuevos movimientos.</p>
+      </div>
     </section>
     <section class="view hidden" id="view-programacion" aria-labelledby="heading-programacion">
       <div class="section-heading"><div><span class="eyebrow">03 · CONTEXTO DE ENTRENAMIENTO</span><h2 id="heading-programacion">Programación oficial</h2></div><span id="plan-count" class="counter">0 sesiones</span></div>
@@ -96,7 +102,7 @@
       <button id="recovery-yes" type="button" class="button caution-action">Sí, generar WOD extra</button>
     </div>
   </dialog>
-  <footer><span id="connectivity">Comprobando conexión…</span><span>Generador WOD 1.0.9 Beta · independiente de Contador WOD</span></footer>
+  <footer><span id="connectivity">Comprobando conexión…</span><span>Generador WOD 1.0.10 Beta · independiente de Contador WOD</span></footer>
 </div>
 <script type="module" src="./app.mjs"></script>
 </body>
