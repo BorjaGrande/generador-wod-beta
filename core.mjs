@@ -1,7 +1,7 @@
-import {OFFICIAL_MOVEMENT_CATALOG,OFFICIAL_LIBRARY_URL} from './catalog.mjs?v=1.0.15';
+import {OFFICIAL_MOVEMENT_CATALOG,OFFICIAL_LIBRARY_URL} from './catalog.mjs?v=1.0.16';
 export {OFFICIAL_MOVEMENT_CATALOG,OFFICIAL_LIBRARY_URL};
 // Generador WOD beta — motor local, independiente de la interfaz y sin servicios externos.
-export const VERSION = '1.0.15-beta';
+export const VERSION = '1.0.16-beta';
 export const EQUIPMENT_GROUPS = [
  {title:'Máquinas',items:[['airbike','Assault / Echo Bike'],['bikeerg','BikeErg'],['skierg','SkiErg'],['rowerg','RowErg / remo'],['treadmill','Cinta de correr']]},
  {title:'Pesos y cargas',items:[['db','Mancuernas (DB)'],['kb','Kettlebells (KB)'],['barbell','Barra olímpica'],['plates','Discos bumper'],['rack','Rack para sentadillas'],['sandbag','Sandbag'],['wallball','Wall Ball'],['walltarget','Objetivo / diana para Wall Ball'],['slamball','Slam Ball'],['medball','Balón medicinal']]},
@@ -744,17 +744,33 @@ export function generateWod({state,mode='random',strategy='libre',duration=15,le
   const prior=normalizeReadiness({...state.readiness,...readiness,effort});
   if(assessment.shouldRecover&&forceExtra!==true)return recoveryRecommendation(date,level,objective,stress,assessment);
   let lastError=null;
-  const successful=[];
-  for(const format of candidateModes){
-   // Aleatoria: evaluar primero la compatibilidad de cada formato y luego
-   // escoger entre los viables, en vez de devolver siempre el primer válido.
-   for(let attempt=0;attempt<(randomRequested?2:1);attempt++){
-    try{
-     const w=buildOptimizedExtra({state,mode:format,date,level,objective,duration,profile,stress,assessment,rng,effort:prior.effort,readiness:prior,forcedAgainstAdvice:assessment.shouldRecover});
-     successful.push(w);break;
-    }catch(err){lastError=err;}
+  let successful=[];
+  // Buscar primero la duración más próxima a la solicitada. Si el presupuesto
+  // de carga hace inviable una sesión larga, probar duraciones menores sin
+  // relajar requisitos técnicos ni contar WODs sin ejecutar como fatiga.
+  // No sustituimos una modalidad seleccionada por otra; solo el modo
+  // Aleatoria compara formatos diferentes.
+  const durationTrials=[duration];
+  if(duration>8){
+   for(const proposed of [20,18,16,14,12,10,8]){
+    if(duration>20&&proposed===20)continue; // la primera prueba ya se recorta a 20 min
+    if(proposed<duration&&proposed>=8&&!durationTrials.includes(proposed))durationTrials.push(proposed);
    }
-   if(!randomRequested)break;
+  }
+  for(const trialDuration of durationTrials){
+   const current=[];
+   for(const format of candidateModes){
+    // El muestreo de ejercicios es estocástico: repetir una vez puede
+    // rescatar una alternativa sin ignorar ningún presupuesto de fatiga.
+    for(let attempt=0;attempt<(randomRequested?2:2);attempt++){
+     try{
+      const w=buildOptimizedExtra({state,mode:format,date,level,objective,duration:trialDuration,requestedDuration:duration,profile,stress,assessment,rng,effort:prior.effort,readiness:prior,forcedAgainstAdvice:assessment.shouldRecover});
+      current.push(w);break;
+     }catch(err){lastError=err;}
+    }
+    if(!randomRequested)break;
+   }
+   if(current.length){successful=current;break;}
   }
   if(successful.length){
    if(!randomRequested)return successful[0];
@@ -773,8 +789,9 @@ export function generateWod({state,mode='random',strategy='libre',duration=15,le
    for(let i=0;i<choices.length;i++){roll-=weights[i];if(roll<0)return choices[i];}
    return choices[choices.length-1];
   }
-  if(forceExtra===true)throw lastError;
-  return recoveryRecommendation(date,level,objective,stress,{...assessment,reason:`${lastError?.message||'No hay una combinación válida.'} Se recomienda recuperar o ajustar los controles.`,highPatterns:assessment.highPatterns});
+  const detail=`No se ha encontrado una combinación compatible con tu material, nivel y presupuesto de carga, incluso probando duraciones menores. ${lastError?.message||''} Prueba otro objetivo, formato o revisa la programación y los resultados realmente realizados.`;
+  if(forceExtra===true||!assessment.shouldRecover)throw new Error(detail);
+  return recoveryRecommendation(date,level,objective,stress,{...assessment,reason:detail,highPatterns:assessment.highPatterns});
  }
  // El modo libre conserva las reglas de 1.0.8.
  const requestedDuration=duration;

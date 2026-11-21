@@ -1,6 +1,6 @@
-# Generador WOD · 1.0.15 Beta — Análisis de resultados reales
+# Generador WOD · 1.0.16 Beta — Corrección de bloqueos y análisis de resultados
 
-Versión incremental de `1.0.14`, compatible con el **Contador WOD 2.2.3**, sin cambios en su repositorio ni en el protocolo de enlace.
+Actualización incremental de `1.0.15`, compatible con el **Contador WOD 2.2.3**, sin cambios en su repositorio ni en el protocolo de enlace.
 
 ## Nuevo panel: Registro → Análisis de resultados
 
@@ -20,12 +20,12 @@ Los cálculos son **descriptivos**. No corrigen automáticamente las dosis, porc
 - Mantiene la importación de resultados del Contador, el botón **Abrir contador WOD**, **Compartir WOD**, **Guardar WOD**, la biblioteca de CrossFit y los perfiles de material y habilidades.
 - Cuando iOS abre el Generador instalado y Safari en contextos de almacenamiento distintos, cada instancia ve únicamente **su historial local**. Una sesión recibida sin la predicción original conservada en ese contexto se excluye de la comparación de tiempo, pero sigue contando en las demás métricas.
 
-## Instalación desde 1.0.14
+## Instalación desde 1.0.15
 
 1. Desde Registro, exportar una copia JSON actualizada; conservarla fuera de la aplicación.
 2. Descomprimir el ZIP y subir los **11 archivos** a la raíz del mismo repositorio `borjagrande/generador-wod-beta` (incluido el nuevo `analytics.mjs`).
 3. Confirmar en GitHub (**Commit changes**).
-4. Abrir la PWA con conexión, cerrarla por completo y abrirla otra vez; comprobar **v1.0.15 BETA**.
+4. Abrir la PWA con conexión, cerrarla por completo y abrirla otra vez; comprobar **v1.0.16 BETA**.
 5. Entrar en **Registro → Análisis de resultados**. Los resultados existentes se analizan automáticamente. No es necesario importar otra vez ORIGIN.
 
 No borrar almacenamiento, no eliminar el icono PWA y no subir tu copia JSON privada al repositorio público.
@@ -34,10 +34,19 @@ No borrar almacenamiento, no eliminar el icono PWA y no subir tu copia JSON priv
 
 - Análisis con datos vacíos, un registro, varios registros, entrada manual sin cronómetro, límite por tiempo, rondas insuficientes, RPE por debajo/dentro/encima del objetivo y recuperación registrada.
 - Importación de las 104 sesiones del CSV ORIGIN y migración de perfiles, WODs y resultados antiguos.
-- Verificación de que `core.mjs` mantiene **exactamente la lógica de generación de 1.0.14**, salvo versión y referencia de caché.
+- Verificación de la generación inteligente de 1.0.16 sobre la base de 1.0.15: conserva presupuestos de carga y requisitos de material y técnica, e incorpora reintentos con menor duración.
 - Revisión sintáctica de módulos JS y de la estructura del ZIP.
 - La ejecución visual automatizada en Chromium no pudo completarse por bloqueo de navegación en el entorno; la validación funcional final del panel debe hacerse en el iPhone.
 
 ## Contador WOD
 
 No necesita actualizarse. La versión compatible es **2.2.3**, ya validada con Generador 1.0.14.
+
+
+## Corrección 1.0.16: rechazos por combinación de duración y objetivo
+
+- El análisis de interferencias usa exclusivamente **programación oficial y resultados realmente registrados**. WODs generados o guardados sin resultado no se contabilizan como carga, aunque el historial de generación sí influye en la variedad.
+- El motor inteligente prueba primero la duración solicitada y, si ninguna opción respeta los límites, prueba duraciones menores (hasta un mínimo de 8 minutos para el mecanismo de rescate). No relaja requisitos de material, técnica, molestias o presupuesto de carga.
+- El WOD resultante conserva la duración originalmente pedida y explica la reducción en las notas. Si ninguna opción es viable, el mensaje describe el bloqueo sin afirmar que se ha entrenado.
+- Mantiene la misma clave de almacenamiento, las sesiones ORIGIN, las transferencias desde el Contador y el panel de análisis. No hace falta volver a importar la programación.
+- **Precaución:** recortar automáticamente una duración no equivale a satisfacer el volumen o estímulo inicialmente solicitado. Revisa la duración del resultado antes de entrenar.

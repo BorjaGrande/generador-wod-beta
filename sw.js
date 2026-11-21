@@ -1,6 +1,6 @@
 /* Aislado del contador: sólo gestiona recursos bajo el scope generador-wod-beta. */
-const CACHE='generador-wod-beta-cache-v1.0.15';
-const CORE=['./','./index.html','./styles.css?v=1.0.15','./app.mjs?v=1.0.15','./core.mjs?v=1.0.15','./catalog.mjs?v=1.0.15','./analytics.mjs?v=1.0.15','./manifest.webmanifest','./icon-192.png','./icon-512.png'];
+const CACHE='generador-wod-beta-cache-v1.0.16';
+const CORE=['./','./index.html','./styles.css?v=1.0.16','./app.mjs?v=1.0.16','./core.mjs?v=1.0.16','./catalog.mjs?v=1.0.16','./analytics.mjs?v=1.0.16','./manifest.webmanifest','./icon-192.png','./icon-512.png'];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(c=>c.addAll(CORE)).then(()=>self.skipWaiting()))});
 self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('generador-wod-beta-cache-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
 self.addEventListener('fetch',event=>{
