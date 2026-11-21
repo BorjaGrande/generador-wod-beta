@@ -1,6 +1,6 @@
-# Generador WOD · 1.0.12 Beta — Variedad y compartir nativo
+# Generador WOD · 1.0.13 Beta — Abrir contador configurado
 
-Actualización sobre el motor 1.0.11.1, compatible con los datos y con la programación ORIGIN importada.
+Actualización sobre el motor 1.0.12, compatible con los datos y con la programación ORIGIN importada.
 
 ## Cambios
 
@@ -15,9 +15,9 @@ Actualización sobre el motor 1.0.11.1, compatible con los datos y con la progra
 
 1. En el iPhone, exportar copia **JSON** desde Registro antes de actualizar.
 2. Descomprimir el ZIP y subir los **diez archivos de la raíz** a `borjagrande/generador-wod-beta`, reemplazando los anteriores, incluido `catalog.mjs`.
-3. Confirmar **Commit changes**. Abrir con internet el enlace de GitHub Pages desde Safari, cerrar la PWA y volver a abrir.
-4. Comprobar **v1.0.12 BETA** y verificar la programación, perfiles de material e historial. **No borrar la app ni sus datos**.
-5. Generar un WOD. Pulsar **Compartir WOD**, elegir la app en el menú nativo y confirmar el envío en esa app.
+3. Antes, actualizar Contador WOD a v2.2.1 en su repositorio independiente. Confirmar **Commit changes** en el Generador. Abrir con internet el enlace de GitHub Pages desde Safari, cerrar la PWA y volver a abrir.
+4. Comprobar **v1.0.13 BETA** y verificar la programación, perfiles de material e historial. **No borrar la app ni sus datos**.
+5. Generar un WOD. Pulsar **Abrir contador WOD** para transferir modalidad y tiempos; **Compartir WOD** mantiene el menú nativo; **Guardar WOD** conserva el resultado para registro.
 
 ## Límites
 
@@ -25,3 +25,10 @@ Actualización sobre el motor 1.0.11.1, compatible con los datos y con la progra
 - El motor sigue siendo heurístico: no promete RPE real ni ausencia de interferencias. Un día muy cargado puede rechazar formatos o no ofrecer WOD extra.
 - La conservación de datos depende de actualizar en el **mismo origen web y navegador/PWA**, sin borrar almacenamiento. La copia JSON es precaución imprescindible.
 - No se incluyen datos personales ni las sesiones ORIGIN en el ZIP; permanecen guardados en local.
+
+
+## Integración v1.0.13
+- Orden de botones: **Abrir contador WOD** (verde), **Compartir WOD** y **Guardar WOD**.
+- El enlace envía únicamente modalidad y tiempos; requiere Contador WOD v2.2.1 o posterior en `https://borjagrande.github.io/contador-wod/`.
+- El reloj queda preparado, sin arrancar hasta pulsar INICIAR. Las PWAs son independientes; iOS puede abrir el contador en Safari.
+- Se conservan las claves de almacenamiento y las sesiones ORIGIN locales.

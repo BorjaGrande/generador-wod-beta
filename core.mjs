@@ -1,7 +1,7 @@
-import {OFFICIAL_MOVEMENT_CATALOG,OFFICIAL_LIBRARY_URL} from './catalog.mjs?v=1.0.12';
+import {OFFICIAL_MOVEMENT_CATALOG,OFFICIAL_LIBRARY_URL} from './catalog.mjs?v=1.0.13';
 export {OFFICIAL_MOVEMENT_CATALOG,OFFICIAL_LIBRARY_URL};
 // Generador WOD beta — motor local, independiente de la interfaz y sin servicios externos.
-export const VERSION = '1.0.12-beta';
+export const VERSION = '1.0.13-beta';
 export const EQUIPMENT_GROUPS = [
  {title:'Máquinas',items:[['airbike','Assault / Echo Bike'],['bikeerg','BikeErg'],['skierg','SkiErg'],['rowerg','RowErg / remo'],['treadmill','Cinta de correr']]},
  {title:'Pesos y cargas',items:[['db','Mancuernas (DB)'],['kb','Kettlebells (KB)'],['barbell','Barra olímpica'],['plates','Discos bumper'],['rack','Rack para sentadillas'],['sandbag','Sandbag'],['wallball','Wall Ball'],['walltarget','Objetivo / diana para Wall Ball'],['slamball','Slam Ball'],['medball','Balón medicinal']]},
@@ -835,3 +835,35 @@ export function formatWhatsapp(w){
  return `${header}${w.forcedAgainstAdvice?'\n*AVISO:* Generado por confirmación expresa pese a recomendar recuperación.':''}\n\n${movements}\n\n*Formato:* ${w.advice}\n*Intensidad:* ${w.intensity}\n*Control de interferencias:* ${w.notes}\n\nRevisar cargas y escalados antes de entrenar.`;
 }
 export function toCSV(rows,headers){const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;return [headers.join(';'),...rows.map(r=>headers.map(h=>q(r[h])).join(';'))].join('\r\n');}
+
+/** URL de preparación de cronómetro. No envía programación, nombres ni resultados. */
+export function contadorUrlForWod(w) {
+ if (!w || w.kind === 'recovery' || !['amrap','fortime','emom','tabata'].includes(w.mode)) throw new Error('Genera primero un WOD con formato compatible.');
+ const url = new URL('https://borjagrande.github.io/contador-wod/');
+ const q = url.searchParams;
+ q.set('from', 'generador-wod');
+ q.set('v', '1');
+ q.set('mode', w.mode);
+ const positiveInt = (value,min,max,label) => { const n=Number(value); if(!Number.isInteger(n)||n<min||n>max)throw new Error(`No puedo configurar el contador: ${label} no válido.`); return n; };
+ if (w.mode === 'amrap') q.set('minutes', String(positiveInt(w.duration,1,180,'duración')));
+ else if (w.mode === 'fortime') q.set('cap',String(positiveInt(w.cap ?? w.duration,0,60,'tiempo máximo')));
+ else if (w.mode === 'emom') {
+  const seconds=positiveInt(w.interval||60,10,600,'duración de intervalo');
+  const totalMinutes=positiveInt(w.duration,1,120,'duración EMOM');
+  const totalSeconds=totalMinutes*60;
+  if(totalSeconds%seconds!==0)throw new Error('La duración del EMOM no coincide con la de sus intervalos.');
+  q.set('intervals',String(positiveInt(totalSeconds/seconds,1,120,'número de intervalos')));
+  q.set('seconds',String(seconds));
+ } else {
+  const t=w.tabata||{};
+  const blocks=positiveInt(t.blocks||1,1,6,'bloques TABATA');
+  const perBlock=positiveInt(t.roundsPerBlock||8,1,60,'rondas por bloque');
+  const work=positiveInt(t.workSeconds||20,5,600,'segundos de trabajo');
+  const rest=positiveInt(t.restSeconds||10,5,600,'segundos de descanso');
+  const pause=positiveInt(t.betweenBlocksSeconds||0,0,600,'pausa entre bloques');
+  positiveInt(blocks*perBlock,1,60,'rondas TABATA');
+  q.set('rounds',String(blocks*perBlock));q.set('work',String(work));q.set('rest',String(rest));
+  if(blocks>1){q.set('blocks',String(blocks));q.set('perblock',String(perBlock));q.set('break',String(pause));}
+ }
+ return url.href;
+}
