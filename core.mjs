@@ -1,7 +1,7 @@
-import {OFFICIAL_MOVEMENT_CATALOG,OFFICIAL_LIBRARY_URL} from './catalog.mjs?v=1.0.13';
+import {OFFICIAL_MOVEMENT_CATALOG,OFFICIAL_LIBRARY_URL} from './catalog.mjs?v=1.0.14';
 export {OFFICIAL_MOVEMENT_CATALOG,OFFICIAL_LIBRARY_URL};
 // Generador WOD beta — motor local, independiente de la interfaz y sin servicios externos.
-export const VERSION = '1.0.13-beta';
+export const VERSION = '1.0.14-beta';
 export const EQUIPMENT_GROUPS = [
  {title:'Máquinas',items:[['airbike','Assault / Echo Bike'],['bikeerg','BikeErg'],['skierg','SkiErg'],['rowerg','RowErg / remo'],['treadmill','Cinta de correr']]},
  {title:'Pesos y cargas',items:[['db','Mancuernas (DB)'],['kb','Kettlebells (KB)'],['barbell','Barra olímpica'],['plates','Discos bumper'],['rack','Rack para sentadillas'],['sandbag','Sandbag'],['wallball','Wall Ball'],['walltarget','Objetivo / diana para Wall Ball'],['slamball','Slam Ball'],['medball','Balón medicinal']]},
@@ -844,6 +844,16 @@ export function contadorUrlForWod(w) {
  q.set('from', 'generador-wod');
  q.set('v', '1');
  q.set('mode', w.mode);
+ // La instantánea mínima viaja en fragmento (#), nunca se solicita al servidor.
+ // Permite identificar el WOD aunque Safari y las PWA tengan almacenamientos separados.
+ const snapshot={id:String(w.id||'').slice(0,100),date:w.date,title:String(w.title||'').slice(0,140),mode:w.mode,
+  level:w.level,strategy:w.strategy,objective:String(w.objective||'').slice(0,140),profileName:String(w.profileName||'').slice(0,80),
+  movements:(w.movements||[]).slice(0,8).map(m=>({id:String(m.id||'').slice(0,80),name:String(m.name||'').slice(0,100),amount:String(m.amount||'').slice(0,100)})),
+  patterns:(w.patterns||[]).slice(0,12).map(p=>String(p).slice(0,30)),readiness:w.readiness||null,effort:w.effort||''};
+ if(!/^wod-[a-zA-Z0-9-]{1,95}$/.test(snapshot.id)||!isISODate(snapshot.date)||!snapshot.movements.length)
+  throw new Error('Faltan datos para enlazar el resultado con este WOD.');
+ q.set('wodid',snapshot.id);
+ url.hash='gw='+encodeURIComponent(JSON.stringify(snapshot));
  const positiveInt = (value,min,max,label) => { const n=Number(value); if(!Number.isInteger(n)||n<min||n>max)throw new Error(`No puedo configurar el contador: ${label} no válido.`); return n; };
  if (w.mode === 'amrap') q.set('minutes', String(positiveInt(w.duration,1,180,'duración')));
  else if (w.mode === 'fortime') q.set('cap',String(positiveInt(w.cap ?? w.duration,0,60,'tiempo máximo')));
@@ -866,4 +876,30 @@ export function contadorUrlForWod(w) {
   if(blocks>1){q.set('blocks',String(blocks));q.set('perblock',String(perBlock));q.set('break',String(pause));}
  }
  return url.href;
+}
+
+
+/** Recibe un resultado finalizado del Contador por URL fragment. No guarda datos automáticamente. */
+export function parseCounterTransfer(hash) {
+ const raw=new URLSearchParams(String(hash||'').replace(/^#/, '')).get('wodresult');
+ if(raw===null)return null;
+ if(raw.length>7000)throw new Error('El resultado del contador supera el tamaño permitido.');
+ let d;try{d=JSON.parse(raw)}catch{throw new Error('Datos del contador dañados.');}
+ const idOk=x=>typeof x==='string'&&/^wod-[a-zA-Z0-9-]{1,95}$/.test(x);
+ if(!d||d.version!==1||d.from!=='contador-wod'||!['amrap','fortime','emom','tabata'].includes(d.mode)||
+    !/^[a-zA-Z0-9-]{6,110}$/.test(d.runId||'')||!Number.isSafeInteger(d.finishedAt)||d.finishedAt<=0||
+    !Number.isSafeInteger(d.elapsedMs)||d.elapsedMs<0||d.elapsedMs>12*3600*1000||
+    !['manual','limit'].includes(d.finishReason)||!Number.isInteger(d.splitsCount)||d.splitsCount<0||d.splitsCount>10000||
+    !Number.isInteger(d.extraReps)||d.extraReps<0||d.extraReps>999||
+    !Number.isInteger(d.doneIntervals)||d.doneIntervals<0||d.doneIntervals>120||
+    (d.splitTimesMs!==undefined&&(!Array.isArray(d.splitTimesMs)||d.splitTimesMs.length>120||!d.splitTimesMs.every(x=>Number.isSafeInteger(x)&&x>=0&&x<=12*3600*1000)))||
+    (d.markedIntervals!==undefined&&(!Array.isArray(d.markedIntervals)||d.markedIntervals.length>120||!d.markedIntervals.every(x=>Number.isInteger(x)&&x>=1&&x<=120)))||
+    !d.wod||!idOk(d.wod.id)||!isISODate(d.wod.date)||d.wod.mode!==d.mode||
+    typeof d.wod.title!=='string'||d.wod.title.length>140||!d.wod.title.trim()||
+    !Array.isArray(d.wod.movements)||d.wod.movements.length<1||d.wod.movements.length>8||
+    !d.wod.movements.every(m=>m&&typeof m.name==='string'&&m.name.length<=100&&typeof m.amount==='string'&&m.amount.length<=100))
+  throw new Error('Enlace de resultado incompleto o incompatible.');
+ const summary=String(d.result||'').slice(0,180);
+ if(!summary)throw new Error('El Contador no envió un resultado interpretable.');
+ return {...d,result:summary};
 }

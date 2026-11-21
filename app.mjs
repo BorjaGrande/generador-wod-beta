@@ -1,8 +1,9 @@
-import {VERSION,EQUIPMENT_GROUPS,SKILLS,MOVEMENTS,OFFICIAL_MOVEMENT_CATALOG,OFFICIAL_LIBRARY_URL,unavailableRequirements,canGenerateMovement,PATTERN_NAMES,DEFAULT_STATE,sanitizeState,normalizeReadiness,isISODate,daysApart,getStress,generateWod,parsePlanCSV,formatWhatsapp,toCSV,contadorUrlForWod} from './core.mjs?v=1.0.13';
+import {VERSION,EQUIPMENT_GROUPS,SKILLS,MOVEMENTS,OFFICIAL_MOVEMENT_CATALOG,OFFICIAL_LIBRARY_URL,unavailableRequirements,canGenerateMovement,PATTERN_NAMES,DEFAULT_STATE,sanitizeState,normalizeReadiness,isISODate,daysApart,getStress,generateWod,parsePlanCSV,formatWhatsapp,toCSV,contadorUrlForWod,parseCounterTransfer} from './core.mjs?v=1.0.14';
 const STORAGE_KEY='generador-wod-beta-v1';
 // La etiqueta de versión depende del motor importado, no sólo del HTML.
 document.querySelector('.version').textContent=`v${VERSION.replace('-beta',' BETA')}`;
 let pendingRecoveryOptions=null;
+let pendingCounterResult=null;
 const $=id=>document.getElementById(id);
 const now=()=>{const t=new Date();return [t.getFullYear(),String(t.getMonth()+1).padStart(2,'0'),String(t.getDate()).padStart(2,'0')].join('-')};
 const node=(tag,text,klass)=>{const e=document.createElement(tag);if(text!==undefined&&text!==null)e.textContent=String(text);if(klass)e.className=klass;return e;};
@@ -179,7 +180,7 @@ function renderWod(w){
  actions.append(btn('Guardar WOD',()=>{if(!state.wods.some(x=>x.id===w.id))state.wods.push(w);save();renderLogWodOptions();notice('WOD guardado para registrar resultados.');},'ghost'));
  panel.append(actions);
 }
-function renderLogWodOptions(){const select=$('log-wod');const prev=select.value;select.replaceChildren();const unique=[...(state.lastWod?[state.lastWod]:[]),...state.wods].filter((w,i,arr)=>arr.findIndex(x=>x.id===w.id)===i).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));if(!unique.length){select.append(option('','Primero genera un WOD'));return}for(const w of unique)select.append(option(w.id,`${w.date} · ${w.title} (${w.strategy})`));if(unique.some(w=>w.id===prev))select.value=prev;}
+function renderLogWodOptions(){const select=$('log-wod');const prev=select.value;select.replaceChildren();const unique=[...(pendingCounterResult?.fallbackWod?[pendingCounterResult.fallbackWod]:[]),...(state.lastWod?[state.lastWod]:[]),...state.wods].filter((w,i,arr)=>arr.findIndex(x=>x.id===w.id)===i).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));if(!unique.length){select.append(option('','Primero genera un WOD'));return}for(const w of unique)select.append(option(w.id,`${w.date} · ${w.title} (${w.strategy})`));if(unique.some(w=>w.id===prev))select.value=prev;}
 function getGenerateOptions(){const readiness=readReadiness();return {mode:$('mode').value,strategy:document.querySelector('input[name="strategy"]:checked').value,duration:Number($('duration').value),level:$('level').value,objective:$('objective').value,date:$('wod-date').value,readiness,effort:readiness.effort};}
 function displayGenerated(wod){
  if(wod.kind==='recovery'){state.lastRecommendation=wod;state.lastWod=null;}
@@ -224,13 +225,60 @@ $('generate').addEventListener('click',()=>{
   if(wod.kind==='recovery')askRecoveryConfirmation(options);
  }catch(err){notice(err.message,'error');}
 });
-function getLogWod(id){return [state.lastWod,...state.wods].find(w=>w?.id===id)}
-$('log-form').addEventListener('submit',ev=>{ev.preventDefault();const f=ev.currentTarget;const d=Object.fromEntries(new FormData(f));const w=getLogWod(d.wod);if(!w){notice('Genera un WOD antes de registrar su resultado.','error');return}if(!isISODate(d.date)||!d.result?.trim()){notice('Introducir fecha y resultado válido.','error');return}const log={id:`log-${Date.now()}`,wodId:w.id,date:d.date,title:w.title,mode:w.mode,strategy:w.strategy,patterns:w.patterns,movementsText:w.movements.map(m=>m.name).join(', '),result:d.result.trim(),weights:d.weights?.trim()||'',notes:d.notes?.trim()||'',rpe:Math.min(10,Math.max(1,Number(d.rpe)||7)),scale:d.scale,preFatigue:w.readiness?.fatigue||'',preSoreness:w.readiness?.soreness||'',targetEffort:w.effort||'',recoveryNext:d.recoveryNext||'sin-evaluar',nextSessionImpact:d.nextSessionImpact||'sin-evaluar',createdAt:new Date().toISOString()};state.logs.unshift(log);if(!state.wods.some(x=>x.id===w.id))state.wods.push(w);save();renderLogs();f.reset();f.elements.date.value=now();notice('Resultado guardado en el historial local.');});
+function getLogWod(id){return [pendingCounterResult?.fallbackWod,state.lastWod,...state.wods].find(w=>w?.id===id)}
+function forgetImportedResult(){
+ pendingCounterResult=null;
+ $('counter-import-banner').classList.add('hidden');
+ if(location.hash.startsWith('#wodresult='))history.replaceState(null,'',location.pathname+location.search);
+}
+function importCounterResultFromHash(){
+ let transfer;try{transfer=parseCounterTransfer(location.hash);}catch(err){
+  showView('historial');notice('No se pudo leer el enlace del Contador: '+err.message,'error');return;
+ }
+ if(!transfer)return;
+ showView('historial');
+ if(state.logs.some(l=>l.counterRunId===transfer.runId)){
+  forgetImportedResult();notice('Esta ejecución del Contador ya está registrada. No se ha creado un duplicado.','warn');return;
+ }
+ const meta=transfer.wod;
+ const fallbackWod={id:meta.id,title:meta.title,date:meta.date,mode:meta.mode,strategy:meta.strategy||'inteligente',
+  level:meta.level||'intermedio',objective:meta.objective||'mixto',profileName:meta.profileName||'',
+  movements:meta.movements.map(m=>({id:m.id||'',name:m.name,amount:m.amount})),
+  patterns:Array.isArray(meta.patterns)?meta.patterns.filter(x=>typeof x==='string').slice(0,12):[],
+  readiness:meta.readiness||null,effort:meta.effort||'',createdAt:new Date(transfer.finishedAt).toISOString(),
+  notes:'WOD restaurado desde el enlace del Contador. No sustituye la programación oficial.'};
+ const saved=getLogWod(meta.id);
+ pendingCounterResult={transfer,fallbackWod:saved||fallbackWod};
+ renderLogWodOptions();
+ const f=$('log-form');f.elements.wod.value=meta.id;
+ const done=new Date(transfer.finishedAt);
+ f.elements.date.value=[done.getFullYear(),String(done.getMonth()+1).padStart(2,'0'),String(done.getDate()).padStart(2,'0')].join('-');
+ f.elements.result.value=transfer.result;
+ f.elements.rpe.value=''; // El RPE nunca se inventa: lo introduce el atleta.
+ f.elements.weights.value='';f.elements.notes.value='';
+ const banner=$('counter-import-banner');banner.classList.remove('hidden');
+ $('counter-import-text').textContent=`${meta.title} · ${transfer.result} · Tiempo medido ${Math.floor(transfer.elapsedMs/60000)}:${String(Math.floor(transfer.elapsedMs/1000)%60).padStart(2,'0')}. Completa RPE y cargas para guardarlo.${!saved?' El WOD original no estaba en este almacenamiento: se ha recuperado del enlace. Si estás en Safari, este registro puede no aparecer en el Generador instalado.':''}`;
+ notice('Resultado recibido del Contador. Comprueba el WOD y completa el RPE real.');
+ banner.scrollIntoView({behavior:'auto',block:'start'});
+}
+$('dismiss-counter-import').addEventListener('click',()=>{forgetImportedResult();renderLogWodOptions();notice('Importación descartada. El resultado original sigue en el Contador.','warn');});
+$('log-form').addEventListener('submit',ev=>{ev.preventDefault();const f=ev.currentTarget;const d=Object.fromEntries(new FormData(f));const w=getLogWod(d.wod);if(!w){notice('Genera un WOD antes de registrar su resultado.','error');return}if(!isISODate(d.date)||!d.result?.trim()){notice('Introducir fecha y resultado válido.','error');return}
+ if(!Number.isInteger(Number(d.rpe))||Number(d.rpe)<1||Number(d.rpe)>10){notice('Introduce tu RPE real (entre 1 y 10).','error');return}
+ if(pendingCounterResult&&pendingCounterResult.transfer.wod.id!==w.id){notice('El resultado del Contador corresponde a otro WOD. Descarta la transferencia antes de registrar uno distinto.','error');return}
+ if(pendingCounterResult&&state.logs.some(l=>l.counterRunId===pendingCounterResult.transfer.runId)){notice('Esta ejecución del Contador ya está registrada.','warn');return}
+ const log={id:`log-${Date.now()}`,wodId:w.id,date:d.date,title:w.title,mode:w.mode,strategy:w.strategy,patterns:w.patterns,movementsText:w.movements.map(m=>m.name).join(', '),result:d.result.trim(),weights:d.weights?.trim()||'',notes:d.notes?.trim()||'',rpe:Math.min(10,Math.max(1,Number(d.rpe)||7)),scale:d.scale,preFatigue:w.readiness?.fatigue||'',preSoreness:w.readiness?.soreness||'',targetEffort:w.effort||'',recoveryNext:d.recoveryNext||'sin-evaluar',nextSessionImpact:d.nextSessionImpact||'sin-evaluar',createdAt:new Date().toISOString()};
+ if(pendingCounterResult){const t=pendingCounterResult.transfer;
+  Object.assign(log,{source:'contador-wod',counterRunId:t.runId,counterElapsedMs:t.elapsedMs,
+   counterFinishedAt:t.finishedAt,counterFinishReason:t.finishReason,counterRounds:t.splitsCount,
+   counterAdditionalReps:t.extraReps,counterDoneIntervals:t.doneIntervals,counterMode:t.mode,
+   counterSplitTimesMs:t.splitTimesMs||[],counterMarkedIntervals:t.markedIntervals||[]});
+ }
+ state.logs.unshift(log);if(!state.wods.some(x=>x.id===w.id))state.wods.push(w);save();forgetImportedResult();renderLogs();f.reset();f.elements.date.value=now();notice('Resultado guardado en el historial local.');});
 function renderLogs(){const list=$('log-list');list.replaceChildren();$('log-count').textContent=`${state.logs.length} resultados`;renderLogWodOptions();if(!state.logs.length){list.append(node('div','No has registrado resultados todavía.','empty'));return}for(const l of [...state.logs].sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,250)){const e=node('div',null,'entry');const head=node('div',null,'entry-head');head.append(node('b',`${l.date} · ${l.title}`),btn('Eliminar',()=>{if(!confirm('¿Eliminar este resultado?'))return;state.logs=state.logs.filter(x=>x.id!==l.id);save();renderLogs()},'danger-ghost small'));e.append(head,node('small',`Resultado: ${l.result} · RPE ${l.rpe}/10 · ${l.scale}\nPesos: ${l.weights||'No indicados'}${l.preFatigue?'\nFatiga previa: '+l.preFatigue+' · Molestias: '+l.preSoreness:''}${l.recoveryNext&&l.recoveryNext!=='sin-evaluar'?'\nRecuperación posterior: '+l.recoveryNext:''}${l.nextSessionImpact&&l.nextSessionImpact!=='sin-evaluar'?'\nSiguiente sesión: '+l.nextSessionImpact:''}${l.notes?'\nNotas: '+l.notes:''}`));list.append(e)}}
 $('export-backup').addEventListener('click',()=>{downloadFile(`generador-wod-copia-${now()}.json`,JSON.stringify(state,null,2),'application/json');notice('Copia JSON exportada. Guárdala fuera del iPhone si es posible.');});
-$('export-logs').addEventListener('click',()=>{const headers=['date','title','mode','strategy','result','weights','rpe','scale','preFatigue','preSoreness','targetEffort','recoveryNext','nextSessionImpact','notes'];downloadFile(`resultados-wod-${now()}.csv`,toCSV(state.logs,headers),'text/csv;charset=utf-8');notice('Resultados exportados en CSV.');});
+$('export-logs').addEventListener('click',()=>{const headers=['date','title','mode','strategy','result','source','counterRunId','counterElapsedMs','counterRounds','counterAdditionalReps','counterDoneIntervals','weights','rpe','scale','preFatigue','preSoreness','targetEffort','recoveryNext','nextSessionImpact','notes'];downloadFile(`resultados-wod-${now()}.csv`,toCSV(state.logs,headers),'text/csv;charset=utf-8');notice('Resultados exportados en CSV.');});
 $('restore-file').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{if(file.size>3_000_000)throw new Error('La copia supera 3 MB.');const raw=JSON.parse(await file.text());if(!raw||typeof raw!=='object'||!Array.isArray(raw.profiles)||!Array.isArray(raw.plan)||!Array.isArray(raw.logs)||!Array.isArray(raw.wods))throw new Error('Formato de copia incompatible.');if(!confirm('Esto sustituirá TODOS los perfiles, programación y resultados actuales. ¿Continuar?'))return;state=sanitizeState(raw);save();renderAll();notice('Copia restaurada.');}catch(err){notice(`No se pudo restaurar: ${err.message}`,'error')}finally{e.target.value=''}});
 function renderAll(){renderProfiles();renderInventory();renderCatalog();renderReadiness();renderPlan();renderWod(state.lastRecommendation||state.lastWod);renderLogs();}
 function connection(){const offline=!navigator.onLine;$('connectivity').textContent=offline?'Sin conexión · datos locales':'Con conexión · datos locales'}window.addEventListener('online',connection);window.addEventListener('offline',connection);
-const date=now();$('wod-date').value=date;$('plan-form').elements.date.value=date;$('log-form').elements.date.value=date;renderAll();connection();
+const date=now();$('wod-date').value=date;$('plan-form').elements.date.value=date;$('log-form').elements.date.value=date;renderAll();connection();importCounterResultFromHash();
 if('serviceWorker' in navigator && location.protocol==='https:')navigator.serviceWorker.register('./sw.js').catch(err=>console.warn('No se pudo activar modo offline:',err));
