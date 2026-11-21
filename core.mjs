@@ -1,7 +1,7 @@
-import {OFFICIAL_MOVEMENT_CATALOG,OFFICIAL_LIBRARY_URL} from './catalog.mjs';
+import {OFFICIAL_MOVEMENT_CATALOG,OFFICIAL_LIBRARY_URL} from './catalog.mjs?v=1.0.12';
 export {OFFICIAL_MOVEMENT_CATALOG,OFFICIAL_LIBRARY_URL};
 // Generador WOD beta — motor local, independiente de la interfaz y sin servicios externos.
-export const VERSION = '1.0.11-beta';
+export const VERSION = '1.0.12-beta';
 export const EQUIPMENT_GROUPS = [
  {title:'Máquinas',items:[['airbike','Assault / Echo Bike'],['bikeerg','BikeErg'],['skierg','SkiErg'],['rowerg','RowErg / remo'],['treadmill','Cinta de correr']]},
  {title:'Pesos y cargas',items:[['db','Mancuernas (DB)'],['kb','Kettlebells (KB)'],['barbell','Barra olímpica'],['plates','Discos bumper'],['rack','Rack para sentadillas'],['sandbag','Sandbag'],['wallball','Wall Ball'],['walltarget','Objetivo / diana para Wall Ball'],['slamball','Slam Ball'],['medball','Balón medicinal']]},
@@ -613,7 +613,7 @@ function novelty110(movements,state,date){
   const shared=[...ids].filter(id=>previous.has(id)).length;
   const similarity=shared/Math.max(1,new Set([...ids,...previous]).size);
   const sameDate=prev.date===date?1.5:1;
-  cost=Math.max(cost,similarity*(13/(1+i*.3))*sameDate);
+  cost=Math.max(cost,similarity*(21/(1+i*.3))*sameDate);
  }
  return -cost;
 }
@@ -630,9 +630,13 @@ function createCandidateSelection109(pool,template,stress,rng,state,date){
    !(domain==='cardio'&&chosen.some(x=>stimulusDomain(x)==='cardio'&&SELECT_FAMILIES[x.id]===SELECT_FAMILIES[m.id]))&&
    !(domain==='core'&&chosen.some(x=>stimulusDomain(x)==='core'&&CORE_FAMILY[x.id]===CORE_FAMILY[m.id])));
   if(!options.length)return null;
+  const lastIds=new Set(history[0]?.ids||[]);
+  const freshCount=options.filter(m=>!lastIds.has(m.id)).length;
   const sorted=options.map(m=>{
-   const repetition=history.reduce((n,h,i)=>n+((h.ids||[]).includes(m.id)?1.4/(1+i*.7):0),0);
-   return {m,rank:extraFatigueRisk(m,stress)+((m.tier||1)-1)*.20+repetition};
+   const repetition=history.reduce((n,h,i)=>n+((h.ids||[]).includes(m.id)?1.7/(1+i*.7):0),0);
+   // No repetir la misma estación si hay opciones elegibles equivalentes.
+   const repeatPenalty=lastIds.has(m.id)&&freshCount>0?2.8:0;
+   return {m,rank:extraFatigueRisk(m,stress)+((m.tier||1)-1)*.20+repetition+repeatPenalty};
   }).sort((a,b)=>a.rank-b.rank);
   const shortlist=sorted.slice(0,Math.min(sorted.length,12));
   chosen.push(chooseFrom(shortlist,rng).m);
@@ -740,9 +744,34 @@ export function generateWod({state,mode='random',strategy='libre',duration=15,le
   const prior=normalizeReadiness({...state.readiness,...readiness,effort});
   if(assessment.shouldRecover&&forceExtra!==true)return recoveryRecommendation(date,level,objective,stress,assessment);
   let lastError=null;
+  const successful=[];
   for(const format of candidateModes){
-   try{return buildOptimizedExtra({state,mode:format,date,level,objective,duration,profile,stress,assessment,rng,effort:prior.effort,readiness:prior,forcedAgainstAdvice:assessment.shouldRecover});}
-   catch(err){lastError=err;if(!randomRequested)break;}
+   // Aleatoria: evaluar primero la compatibilidad de cada formato y luego
+   // escoger entre los viables, en vez de devolver siempre el primer válido.
+   for(let attempt=0;attempt<(randomRequested?2:1);attempt++){
+    try{
+     const w=buildOptimizedExtra({state,mode:format,date,level,objective,duration,profile,stress,assessment,rng,effort:prior.effort,readiness:prior,forcedAgainstAdvice:assessment.shouldRecover});
+     successful.push(w);break;
+    }catch(err){lastError=err;}
+   }
+   if(!randomRequested)break;
+  }
+  if(successful.length){
+   if(!randomRequested)return successful[0];
+   const recent=history110(state);
+   const lastMode=recent[0]?.mode;
+   // Con alternativas compatibles no repetir automáticamente el último formato.
+   const alternatives=successful.length>1?successful.filter(w=>w.mode!==lastMode):[];
+   const choices=alternatives.length?alternatives:successful;
+   const weights=choices.map(w=>{
+    const times=recent.slice(0,8).reduce((n,h,i)=>n+(h.mode===w.mode?1/(1+i*.5):0),0);
+    const durationPenalty=w.requestedDuration&&w.duration<w.requestedDuration*.65?0.75:1;
+    return durationPenalty/(0.65+times);
+   });
+   const total=weights.reduce((n,x)=>n+x,0);
+   let roll=rng()*total;
+   for(let i=0;i<choices.length;i++){roll-=weights[i];if(roll<0)return choices[i];}
+   return choices[choices.length-1];
   }
   if(forceExtra===true)throw lastError;
   return recoveryRecommendation(date,level,objective,stress,{...assessment,reason:`${lastError?.message||'No hay una combinación válida.'} Se recomienda recuperar o ajustar los controles.`,highPatterns:assessment.highPatterns});

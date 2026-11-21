@@ -1,39 +1,27 @@
-# Generador WOD · 1.0.11 Beta — Selección y variedad de entrenamientos
+# Generador WOD · 1.0.12 Beta — Variedad y compartir nativo
 
-Actualización incremental sobre **v1.0.10** para GitHub Pages/PWA de iPhone.
+Actualización sobre el motor 1.0.11.1, compatible con los datos y con la programación ORIGIN importada.
 
-## Qué se ha corregido
+## Cambios
 
-- **Modalidad aleatoria con memoria local de las 12 últimas generaciones.** Se favorecen formatos menos utilizados recientemente; se prueba otro formato cuando el primero no encuentra un WOD compatible. Si sólo uno es viable, puede repetirse. La modalidad elegida explícitamente por el usuario se respeta.
-- **Más estructuras de CrossFit:** se prueban circuitos con carrera/cardio, piernas, empuje, tracción, gimnasia y cargas dosificadas. No es obligatorio que cada entrenamiento incluya Sit-ups o comba.
-- **Menos repeticiones de WODs anteriores:** se penalizan los mismos movimientos, especialmente para una misma fecha. La novedad nunca tiene prioridad sobre la compatibilidad.
-- **Dosis mínima orientativa:** se rechazan estaciones cargadas cuya dosis resultaría testimonial; además se consideran los metros, calorías y segundos de manera distinta de las repeticiones.
-- **Límites adicionales de volumen técnico:** movimientos olímpicos y gimnasia compleja tienen topes de repeticiones por sesión, aparte del presupuesto general de patrones.
-- **AMRAP a ritmo productivo:** estimación de rondas con transiciones y pequeñas pausas, sin suponer una ronda adicional completa. Se indica el margen de 10–20 s por ronda en las instrucciones.
-- **TABATA:** si no caben tres bloques dentro de las restricciones, el motor evalúa dos o uno e informa de la duración efectiva (14, 9 o 4 minutos según el caso).
-- **FOR TIME en días de recuperación recomendada:** al confirmar la generación puede reducirse el CAP de 15 a 12 minutos, explicando el ajuste. Si no existe alternativa suficientemente productiva, informa de ello.
-- **Riesgo estimado más contextual:** no se etiqueta automáticamente como moderada-alta una propuesta sólo por usar buena parte del presupuesto numérico.
-
-## Se conserva de versiones anteriores
-
-- **Catálogo de 122 movimientos** y requisitos de material, nivel técnico y habilidad establecidos en 1.0.10. Los filtros se comprueban antes de la selección.
-- **Programación ORIGIN importada**, exactamente como fue cargada; el generador no sobrescribe los WODs oficiales.
-- Perfiles de material, habilidades, resultados, WODs anteriores, recuperaciones, copias de seguridad JSON y controles de fatiga/molestias/RPE.
-- La clave local `generador-wod-beta-v1`. El nuevo campo opcional `generationHistory` añade únicamente un registro compacto de las doce generaciones recientes y no requiere migración manual. Las copias antiguas siguen siendo legibles.
-- Independencia de la aplicación Contador WOD.
+- El botón **«Copiar para WhatsApp»** pasa a **«Compartir WOD»**. Llama a `navigator.share({ title, text })` directamente desde el toque del usuario para abrir el menú nativo de compartir del iPhone/Android, con el texto completo ya preparado (líneas y marcado con asteriscos). Permite elegir WhatsApp, Mensajes, Mail y cualquier otra aplicación compatible instalada. No envía mensajes automáticamente. En avisos de recuperación se ofrece **«Compartir recomendación»**.
+- Si el dispositivo o navegador no ofrece compartir nativo, el botón **copia el texto al portapapeles** y lo indica; si tampoco puede copiar, muestra el texto seleccionable manualmente. Cuando el usuario cancela el menú de compartir, no copia nada sin pedirlo.
+- **Modalidad Aleatoria** compara resultados de cada formato viable antes de elegir; evita repetir el formato anterior si existen otros válidos y da preferencia a los menos utilizados recientemente. La modalidad elegida expresamente sigue respetándose.
+- Penaliza adicionalmente los movimientos repetidos de las últimas generaciones, siempre que existan alternativas técnicamente y materialmente elegibles.
+- Conserva las restricciones de equipo y habilidades del catálogo CrossFit, los límites de volumen por patrón, la confirmación de recuperación y la programación oficial.
+- Incorpora el versionado de recursos y sincronización de caché de la 1.0.11.1.
 
 ## Instalación
 
-1. En la app actual, pulsa **Registro → Exportar copia JSON** y guarda el archivo fuera de Safari.
-2. Descomprime el ZIP de la versión 1.0.11 y sube **los diez archivos**, sin carpeta contenedora, a la raíz de `borjagrande/generador-wod-beta` en GitHub.
-3. Usa *Commit changes*. Abre la misma URL con internet, cierra completamente la aplicación del iPhone y vuelve a abrirla.
-4. Comprueba que aparece **v1.0.11 BETA**. No borres el icono ni los datos locales; no hace falta reimportar ORIGIN.
-5. En Generar, selecciona **Extra inteligente · Modalidad aleatoria · 22/11/2026 · Avanzado/RX · 15 minutos · Fatiga media · Sin molestias · RPE 6–7**. Genera cuatro WODs seguidos y observa formatos, ejercicios y advertencias.
+1. En el iPhone, exportar copia **JSON** desde Registro antes de actualizar.
+2. Descomprimir el ZIP y subir los **diez archivos de la raíz** a `borjagrande/generador-wod-beta`, reemplazando los anteriores, incluido `catalog.mjs`.
+3. Confirmar **Commit changes**. Abrir con internet el enlace de GitHub Pages desde Safari, cerrar la PWA y volver a abrir.
+4. Comprobar **v1.0.12 BETA** y verificar la programación, perfiles de material e historial. **No borrar la app ni sus datos**.
+5. Generar un WOD. Pulsar **Compartir WOD**, elegir la app en el menú nativo y confirmar el envío en esa app.
 
-## Limitaciones y validación
+## Límites
 
-Los presupuestos por patrón y el RPE objetivo siguen siendo **heurísticas**, no medidas fisiológicas ni garantías de ausencia de interferencia. La biblioteca de ejercicios no sustituye supervisión técnica. La aplicación no cambia el nivel de habilidad ni marca automáticamente equipo; un ejercicio sin cualquiera de sus requisitos sigue bloqueado.
-
-Pruebas de la implementación: importación de 104 sesiones ORIGIN; matriz de niveles, formatos y estados de fatiga con aceptaciones/rechazos explícitos; comprobación de requisitos de barra/habilidad y conservación de datos; comprobación automatizada de la interfaz de generación, confirmación y persistencia de historial con navegador aislado. Sigue pendiente verificar la versión desplegada como PWA y su actualización de caché en un iPhone real.
-
-**Nota:** un día especialmente cargado puede ofrecer menos opciones, o exigir recuperar, aunque el usuario seleccione Aleatoria. El generador no inventa estímulos intensos ni incrementa cargas sólo para asegurar cuatro modalidades diferentes.
+- El menú nativo entrega el texto al destino seleccionado, pero **no garantiza una copia simultánea al portapapeles** (ni es necesaria para enviar). La opción de copiar queda disponible en el menú según el sistema. No se elige destinatario ni se envía automáticamente. La disponibilidad depende del navegador, permisos e instalación de apps; requiere HTTPS para Web Share API.
+- El motor sigue siendo heurístico: no promete RPE real ni ausencia de interferencias. Un día muy cargado puede rechazar formatos o no ofrecer WOD extra.
+- La conservación de datos depende de actualizar en el **mismo origen web y navegador/PWA**, sin borrar almacenamiento. La copia JSON es precaución imprescindible.
+- No se incluyen datos personales ni las sesiones ORIGIN en el ZIP; permanecen guardados en local.

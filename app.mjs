@@ -1,5 +1,7 @@
-import {VERSION,EQUIPMENT_GROUPS,SKILLS,MOVEMENTS,OFFICIAL_MOVEMENT_CATALOG,OFFICIAL_LIBRARY_URL,unavailableRequirements,canGenerateMovement,PATTERN_NAMES,DEFAULT_STATE,sanitizeState,normalizeReadiness,isISODate,daysApart,getStress,generateWod,parsePlanCSV,formatWhatsapp,toCSV} from './core.mjs';
+import {VERSION,EQUIPMENT_GROUPS,SKILLS,MOVEMENTS,OFFICIAL_MOVEMENT_CATALOG,OFFICIAL_LIBRARY_URL,unavailableRequirements,canGenerateMovement,PATTERN_NAMES,DEFAULT_STATE,sanitizeState,normalizeReadiness,isISODate,daysApart,getStress,generateWod,parsePlanCSV,formatWhatsapp,toCSV} from './core.mjs?v=1.0.12';
 const STORAGE_KEY='generador-wod-beta-v1';
+// La etiqueta de versión depende del motor importado, no sólo del HTML.
+document.querySelector('.version').textContent=`v${VERSION.replace('-beta',' BETA')}`;
 let pendingRecoveryOptions=null;
 const $=id=>document.getElementById(id);
 const now=()=>{const t=new Date();return [t.getFullYear(),String(t.getMonth()+1).padStart(2,'0'),String(t.getDate()).padStart(2,'0')].join('-')};
@@ -14,10 +16,62 @@ for(const id of ['readiness-fatigue','readiness-soreness','readiness-effort'])$(
 
 function notice(message,type='success'){const el=$('notice');el.textContent=message;el.className=`notice show ${type}`;el.scrollIntoView({behavior:'auto',block:'nearest'});}
 function clearNotice(){$('notice').className='notice';$('notice').textContent=''}
+// Un error anterior no debe aparecer como resultado de una fecha nueva.
+for(const id of ['wod-date','mode','duration','level','objective','profile-select','readiness-fatigue','readiness-soreness','readiness-effort'])$(id).addEventListener('change',clearNotice);
 function btn(title,callback,style='ghost'){const b=node('button',title,`button ${style}`);b.type='button';b.addEventListener('click',callback);return b;}
 function option(value,label){const e=document.createElement('option');e.value=value;e.textContent=label;return e;}
 function downloadFile(filename,content,type){const b=new Blob([content],{type});const a=document.createElement('a');const url=URL.createObjectURL(b);a.href=url;a.download=filename;a.style.display='none';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),3000)}
-async function copyText(content){try{if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(content);notice('WOD copiado. Puedes pegarlo en WhatsApp.');return;}throw new Error('Clipboard no disponible');}catch{const area=node('textarea');area.value=content;document.body.append(area);area.select();const copied=document.execCommand('copy');area.remove();notice(copied?'WOD copiado. Puedes pegarlo en WhatsApp.':'No se ha podido copiar automáticamente. Selecciona y copia el texto manualmente.',copied?'success':'warn')}}
+// Compartir directamente por la hoja nativa del dispositivo (iOS / Android).
+// La llamada a navigator.share se realiza en el gesto del usuario, sin awaits
+// previos para no perder la activación transitoria necesaria en Safari/PWA.
+async function copyText(content){
+ try{
+  if(navigator.clipboard?.writeText){
+   await navigator.clipboard.writeText(content);
+   notice('Menú nativo no disponible. Texto copiado; puedes pegarlo en la aplicación que quieras.');
+   return;
+  }
+  throw new Error('Portapapeles moderno no disponible');
+ }catch{
+  const area=node('textarea');area.value=content;
+  area.readOnly=true;area.setAttribute('aria-label','Texto del entrenamiento para copiar');
+  area.style.cssText='position:fixed;top:0;left:0;opacity:0;width:1px;height:1px;';
+  document.body.append(area);area.focus();area.select();
+  area.setSelectionRange(0,area.value.length);
+  let copied=false;
+  try{copied=document.execCommand('copy');}catch{}
+  area.remove();
+  if(copied)notice('Menú nativo no disponible. Texto copiado; puedes pegarlo donde quieras.');
+  else{
+   // Dejar el contenido accesible para selección manual si tampoco hay portapapeles.
+   const panel=$('wod-result');
+   const fallback=node('textarea',null,'share-fallback');fallback.value=content;
+   fallback.readOnly=true;fallback.rows=8;fallback.style.width='100%';
+   panel.append(node('p','No se ha podido compartir ni copiar automáticamente. Selecciona el texto y cópialo manualmente.','wod-info'),fallback);
+   fallback.focus();fallback.select();
+   notice('Compartir no disponible: el texto está seleccionado para copiar manualmente.','warn');
+  }
+ }
+}
+async function shareWod(w){
+ const content=formatWhatsapp(w);
+ if(typeof navigator.share==='function'){
+  try{
+   await navigator.share({title:'Entrenamiento · Generador WOD',text:content});
+   return;
+  }catch(err){
+   // Cerrar la hoja de compartir es una elección normal: no copiar sin permiso.
+   if(err?.name==='AbortError')return;
+   console.warn('Compartir nativo no disponible:',err);
+  }
+ }
+ await copyText(content);
+}
+function shareWodButton(w,label='Compartir WOD'){
+ const b=btn(label,()=>{void shareWod(w);},'primary');
+ b.setAttribute('aria-label',label+' mediante el menú de compartir del dispositivo');
+ return b;
+}
 function showView(which){document.querySelectorAll('.view').forEach(el=>el.classList.toggle('hidden',el.id!==`view-${which}`));document.querySelectorAll('.tab').forEach(el=>{const active=el.dataset.view===which;el.classList.toggle('active',active);el.setAttribute('aria-current',active?'page':'false')});clearNotice();window.scrollTo({top:0,behavior:'instant'});if(which==='historial')renderLogs();}
 for(const tab of document.querySelectorAll('.tab'))tab.addEventListener('click',()=>showView(tab.dataset.view));
 function getProfile(){return state.profiles.find(p=>p.id===state.activeProfile)||state.profiles[0]}
@@ -104,7 +158,7 @@ function renderWod(w){
   panel.append(node('p','El análisis aconseja priorizar la recuperación. Este aviso no se añadirá a los WODs guardados ni a los resultados.','wod-info'));
   for(const m of w.movements){const line=node('div',null,'wod-movement');line.append(node('div',m.amount,'wod-amount'),node('div',m.name,'wod-name'));panel.append(line)}
   const info=node('div',null,'wod-advice');info.append(node('b',w.advice),node('p',`Intensidad: ${w.intensity}`),node('p',`Motivo: ${w.notes}`));panel.append(info);
-  const actions=node('div',null,'wod-actions');actions.append(btn('Copiar recomendación',()=>copyText(formatWhatsapp(w)),'ghost'),btn('Generar de todos modos',()=>askRecoveryConfirmation(pendingRecoveryOptions),'caution-action'));panel.append(actions);
+  const actions=node('div',null,'wod-actions');actions.append(shareWodButton(w,'Compartir recomendación'),btn('Generar de todos modos',()=>askRecoveryConfirmation(pendingRecoveryOptions),'caution-action'));panel.append(actions);
   return;
  }
  panel.append(node('div',w.forcedAgainstAdvice?'WOD EXTRA CON PRECAUCIÓN':w.strategy==='inteligente'?'WOD EXTRA INTELIGENTE':'WOD LIBRE','wod-kicker'),node('h2',w.title,'wod-title'));
@@ -115,7 +169,7 @@ function renderWod(w){
   if(ref){const a=node('a',ref.sourceUrl===OFFICIAL_LIBRARY_URL?'Biblioteca de movimientos':'Ver técnica / vídeo oficial','catalog-official');a.href=ref.sourceUrl;a.target='_blank';a.rel='noopener noreferrer';line.append(a);}
   panel.append(line)}
  const info=node('div',null,'wod-advice');info.append(node('b',w.advice),node('p',`Intensidad: ${w.intensity}`));if(w.stimulusReport){const r=w.stimulusReport;info.append(node('p',`Estímulo previsto: ${r.domains.join(' + ')}. Interferencia estimada: ${r.interference}.`));if(Number.isFinite(r.score))info.append(node('p',`Evaluación heurística: ${r.score}/100 · Uso máximo del presupuesto de carga: ${r.budgetUse}%${Number.isFinite(r.expectedMinutes)&&w.mode==='fortime'?` · Tiempo aproximado ${r.expectedMinutes} min`:''}. No equivale a seguridad o RPE real.`));}info.append(node('p',`Control de interferencias: ${w.notes}`));panel.append(info);
- const actions=node('div',null,'wod-actions');actions.append(btn('Guardar WOD',()=>{if(!state.wods.some(x=>x.id===w.id))state.wods.push(w);save();renderLogWodOptions();notice('WOD guardado para registrar resultados.');},'primary'),btn('Copiar para WhatsApp',()=>copyText(formatWhatsapp(w))));
+ const actions=node('div',null,'wod-actions');actions.append(shareWodButton(w),btn('Guardar WOD',()=>{if(!state.wods.some(x=>x.id===w.id))state.wods.push(w);save();renderLogWodOptions();notice('WOD guardado para registrar resultados.');},'ghost'));
  const timer=node('a','Abrir Contador WOD (configurar reloj manualmente)','button ghost');timer.href='https://borjagrande.github.io/contador-wod/';timer.target='_blank';timer.rel='noopener noreferrer';actions.append(timer);panel.append(actions);
 }
 function renderLogWodOptions(){const select=$('log-wod');const prev=select.value;select.replaceChildren();const unique=[...(state.lastWod?[state.lastWod]:[]),...state.wods].filter((w,i,arr)=>arr.findIndex(x=>x.id===w.id)===i).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));if(!unique.length){select.append(option('','Primero genera un WOD'));return}for(const w of unique)select.append(option(w.id,`${w.date} · ${w.title} (${w.strategy})`));if(unique.some(w=>w.id===prev))select.value=prev;}

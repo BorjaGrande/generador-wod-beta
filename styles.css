@@ -101,3 +101,6 @@ a.catalog-official{font-size:12px;color:#94c9ff;text-decoration:underline;displa
 .skill-category{border:1px solid rgba(145,160,180,.22);border-radius:11px;margin-bottom:7px;padding:10px}
 .skill-category>summary{cursor:pointer;font-weight:650;font-size:14px}
 .skill-category>.check-grid{padding-top:12px}
+
+/* v1.0.12: acciones grandes y accesibles para compartir en iPhone */
+.wod-actions .button{grid-column:1/-1;width:100%}
