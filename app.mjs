@@ -1,4 +1,5 @@
-import {VERSION,EQUIPMENT_GROUPS,SKILLS,MOVEMENTS,OFFICIAL_MOVEMENT_CATALOG,OFFICIAL_LIBRARY_URL,unavailableRequirements,canGenerateMovement,PATTERN_NAMES,DEFAULT_STATE,sanitizeState,normalizeReadiness,isISODate,daysApart,getStress,generateWod,parsePlanCSV,formatWhatsapp,toCSV,contadorUrlForWod,parseCounterTransfer} from './core.mjs?v=1.0.14';
+import {VERSION,EQUIPMENT_GROUPS,SKILLS,MOVEMENTS,OFFICIAL_MOVEMENT_CATALOG,OFFICIAL_LIBRARY_URL,unavailableRequirements,canGenerateMovement,PATTERN_NAMES,DEFAULT_STATE,sanitizeState,normalizeReadiness,isISODate,daysApart,getStress,generateWod,parsePlanCSV,formatWhatsapp,toCSV,contadorUrlForWod,parseCounterTransfer} from './core.mjs?v=1.0.15';
+import {analyzeTrainingResults} from './analytics.mjs?v=1.0.15';
 const STORAGE_KEY='generador-wod-beta-v1';
 // La etiqueta de versión depende del motor importado, no sólo del HTML.
 document.querySelector('.version').textContent=`v${VERSION.replace('-beta',' BETA')}`;
@@ -274,7 +275,64 @@ $('log-form').addEventListener('submit',ev=>{ev.preventDefault();const f=ev.curr
    counterSplitTimesMs:t.splitTimesMs||[],counterMarkedIntervals:t.markedIntervals||[]});
  }
  state.logs.unshift(log);if(!state.wods.some(x=>x.id===w.id))state.wods.push(w);save();forgetImportedResult();renderLogs();f.reset();f.elements.date.value=now();notice('Resultado guardado en el historial local.');});
-function renderLogs(){const list=$('log-list');list.replaceChildren();$('log-count').textContent=`${state.logs.length} resultados`;renderLogWodOptions();if(!state.logs.length){list.append(node('div','No has registrado resultados todavía.','empty'));return}for(const l of [...state.logs].sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,250)){const e=node('div',null,'entry');const head=node('div',null,'entry-head');head.append(node('b',`${l.date} · ${l.title}`),btn('Eliminar',()=>{if(!confirm('¿Eliminar este resultado?'))return;state.logs=state.logs.filter(x=>x.id!==l.id);save();renderLogs()},'danger-ghost small'));e.append(head,node('small',`Resultado: ${l.result} · RPE ${l.rpe}/10 · ${l.scale}\nPesos: ${l.weights||'No indicados'}${l.preFatigue?'\nFatiga previa: '+l.preFatigue+' · Molestias: '+l.preSoreness:''}${l.recoveryNext&&l.recoveryNext!=='sin-evaluar'?'\nRecuperación posterior: '+l.recoveryNext:''}${l.nextSessionImpact&&l.nextSessionImpact!=='sin-evaluar'?'\nSiguiente sesión: '+l.nextSessionImpact:''}${l.notes?'\nNotas: '+l.notes:''}`));list.append(e)}}
+function renderAnalytics(){
+ const holder=$('analysis-panel');if(!holder)return;
+ const summary=$('analysis-summary');summary.replaceChildren();
+ const a=analyzeTrainingResults(state);
+ const metric=(label,value,context='')=>{
+  const div=node('div',null,'analysis-metric');
+  div.append(node('small',label),node('strong',value));
+  if(context)div.append(node('span',context));
+  return div;
+ };
+ const formatRpe=v=>v===null?'—':`${v.toFixed(1).replace('.',',')}/10`;
+ const cards=node('div',null,'analysis-metrics');
+ cards.append(metric('Sesiones registradas',String(a.total),'Sólo en este navegador'),
+  metric('Desde Contador',String(a.linkedFromCounter),'Enlaces guardados'),
+  metric('RPE real medio',formatRpe(a.averageRpe),'Sólo registros con RPE'),
+  metric('Tiempos comparables',String(a.comparisons.length),'FOR TIME con rondas marcadas'));
+ summary.append(cards);
+ if(a.total===0){summary.append(node('p','Todavía no hay resultados guardados. Entrena un WOD, devuelve el resultado desde el Contador y registra tu RPE real. El análisis aparecerá aquí.','analysis-empty'));return;}
+ const quality=node('div',null,'analysis-block');
+ quality.append(node('h4','Calidad del registro'),
+  node('p',`${a.measuredCount} con tiempo medido · ${a.withWeights} con pesos registrados · ${a.recoveryReported} con recuperación posterior · ${a.impactReported} con impacto en la siguiente sesión.`, 'analysis-explain'));
+ summary.append(quality);
+ const formats=node('div',null,'analysis-block');
+ formats.append(node('h4','Resultados por modalidad'));
+ const formatsGrid=node('div',null,'analysis-formats');
+ for(const item of a.byMode){
+  const div=node('div',null,'analysis-mode');
+  div.append(node('b',item.label),node('span',`${item.count} registro${item.count===1?'':'s'}`),node('small',`RPE observado: ${formatRpe(item.averageRpe)}`));formatsGrid.append(div);
+ }
+ formats.append(formatsGrid);summary.append(formats);
+ const rpe=node('div',null,'analysis-block');
+ rpe.append(node('h4','Esfuerzo real frente al RPE previsto'));
+ if(a.rpeMatches.comparable){
+  rpe.append(node('p',`${a.rpeMatches.within} dentro del rango previsto · ${a.rpeMatches.above} por encima · ${a.rpeMatches.below} por debajo.`, 'analysis-explain'));
+  rpe.append(node('p',`Comparación disponible en ${a.rpeMatches.comparable} de ${a.total} registros. Los objetivos sin dato fiable no se comparan.`, 'analysis-hint'));
+ }else rpe.append(node('p','Aún no hay suficientes datos de RPE previsto y real para compararlos.', 'analysis-explain'));
+ summary.append(rpe);
+ const times=node('div',null,'analysis-block');
+ times.append(node('h4','Tiempo real frente al estimado · FOR TIME'));
+ if(a.comparisons.length){
+  for(const c of a.comparisons.slice(0,4)){
+   const div=node('div',null,'analysis-time');
+   div.append(node('b',`${c.date} · ${c.title}`),node('span',`Previsto: ${c.predictedMinutes.toFixed(1).replace('.',',')} min · Cronometrado: ${c.observedMinutes.toFixed(1).replace('.',',')} min · Diferencia: ${c.differenceMinutes>=0?'+':''}${c.differenceMinutes.toFixed(1).replace('.',',')} min`));
+   times.append(div);
+  }
+  times.append(node('p','Se muestran únicamente sesiones detenidas manualmente con las rondas previstas marcadas y una estimación previa. Marcar rondas no demuestra que el WOD se haya completado correctamente. No se compara el CAP ni otros formatos como si fueran tiempos de finalización.','analysis-hint'));
+ }else times.append(node('p','Sin comparaciones válidas por ahora: hacen falta un FOR TIME cronometrado, sus rondas marcadas y la estimación original. Los resultados manuales no se tratan como tiempos medidos.', 'analysis-explain'));
+ summary.append(times);
+ const follow=node('div',null,'analysis-block');
+ follow.append(node('h4','Recuperación e interferencias observadas'),
+  node('p',`Recuperación: buena ${a.followup.good}, normal ${a.followup.normal}, mala ${a.followup.bad}. Siguiente sesión: sin impacto aparente ${a.impact.none}, posible interferencia ${a.impact.possible}, interferencia clara ${a.impact.clear}.`, 'analysis-explain'));
+ summary.append(follow);
+ const foot=node('p',a.enoughForReview?
+  `Hay ${a.total} registros: puedes revisar tendencias descriptivas, pero no permiten atribuir una mejora o una interferencia al WOD extra. La generación no se reajusta automáticamente.`:
+  `Muestra pequeña: ${a.total} de ${5} registros como referencia inicial. No es suficiente para calibrar el algoritmo; sólo se muestran datos descriptivos.`, 'analysis-warning');
+ summary.append(foot);
+}
+function renderLogs(){renderAnalytics();const list=$('log-list');list.replaceChildren();$('log-count').textContent=`${state.logs.length} resultados`;renderLogWodOptions();if(!state.logs.length){list.append(node('div','No has registrado resultados todavía.','empty'));return}for(const l of [...state.logs].sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,250)){const e=node('div',null,'entry');const head=node('div',null,'entry-head');head.append(node('b',`${l.date} · ${l.title}`),btn('Eliminar',()=>{if(!confirm('¿Eliminar este resultado?'))return;state.logs=state.logs.filter(x=>x.id!==l.id);save();renderLogs()},'danger-ghost small'));e.append(head,node('small',`Resultado: ${l.result} · RPE ${l.rpe}/10 · ${l.scale}\nPesos: ${l.weights||'No indicados'}${l.preFatigue?'\nFatiga previa: '+l.preFatigue+' · Molestias: '+l.preSoreness:''}${l.recoveryNext&&l.recoveryNext!=='sin-evaluar'?'\nRecuperación posterior: '+l.recoveryNext:''}${l.nextSessionImpact&&l.nextSessionImpact!=='sin-evaluar'?'\nSiguiente sesión: '+l.nextSessionImpact:''}${l.notes?'\nNotas: '+l.notes:''}`));list.append(e)}}
 $('export-backup').addEventListener('click',()=>{downloadFile(`generador-wod-copia-${now()}.json`,JSON.stringify(state,null,2),'application/json');notice('Copia JSON exportada. Guárdala fuera del iPhone si es posible.');});
 $('export-logs').addEventListener('click',()=>{const headers=['date','title','mode','strategy','result','source','counterRunId','counterElapsedMs','counterRounds','counterAdditionalReps','counterDoneIntervals','weights','rpe','scale','preFatigue','preSoreness','targetEffort','recoveryNext','nextSessionImpact','notes'];downloadFile(`resultados-wod-${now()}.csv`,toCSV(state.logs,headers),'text/csv;charset=utf-8');notice('Resultados exportados en CSV.');});
 $('restore-file').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{if(file.size>3_000_000)throw new Error('La copia supera 3 MB.');const raw=JSON.parse(await file.text());if(!raw||typeof raw!=='object'||!Array.isArray(raw.profiles)||!Array.isArray(raw.plan)||!Array.isArray(raw.logs)||!Array.isArray(raw.wods))throw new Error('Formato de copia incompatible.');if(!confirm('Esto sustituirá TODOS los perfiles, programación y resultados actuales. ¿Continuar?'))return;state=sanitizeState(raw);save();renderAll();notice('Copia restaurada.');}catch(err){notice(`No se pudo restaurar: ${err.message}`,'error')}finally{e.target.value=''}});
