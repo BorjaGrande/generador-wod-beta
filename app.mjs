@@ -122,7 +122,7 @@ function renderLogWodOptions(){const select=$('log-wod');const prev=select.value
 function getGenerateOptions(){const readiness=readReadiness();return {mode:$('mode').value,strategy:document.querySelector('input[name="strategy"]:checked').value,duration:Number($('duration').value),level:$('level').value,objective:$('objective').value,date:$('wod-date').value,readiness,effort:readiness.effort};}
 function displayGenerated(wod){
  if(wod.kind==='recovery'){state.lastRecommendation=wod;state.lastWod=null;}
- else {state.lastWod=wod;state.lastRecommendation=null;}
+ else {state.lastWod=wod;state.lastRecommendation=null;state.generationHistory=[{date:wod.date,mode:wod.mode,ids:wod.movements.map(m=>m.id)},...(state.generationHistory||[])].slice(0,12);}
  save();renderWod(wod);renderLogWodOptions();clearNotice();
  $('wod-result').scrollIntoView({behavior:'smooth',block:'start'});
 }

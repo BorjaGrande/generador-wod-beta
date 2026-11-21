@@ -1,26 +1,39 @@
-# Generador WOD · v1.0.10 Beta — Biblioteca CrossFit + requisitos estrictos
+# Generador WOD · 1.0.11 Beta — Selección y variedad de entrenamientos
 
-**Actualización incremental sobre v1.0.9.** Extrae los **10 archivos** en la raíz del mismo repositorio GitHub Pages. La clave de almacenamiento local sigue siendo `generador-wod-beta-v1` y se mantiene la programación ORIGIN, perfiles, WODs y resultados anteriores. Haz copia JSON antes de actualizar.
+Actualización incremental sobre **v1.0.10** para GitHub Pages/PWA de iPhone.
 
-## Cambios
+## Qué se ha corregido
 
-- Catálogo curado a partir de [la biblioteca oficial de movimientos CrossFit](https://www.crossfit.com/crossfit-movements), con distinción explícita entre movimientos del índice y otros habituales en WOD oficiales (running, bicicletas, SkiErg).
-- Biblioteca buscable en **MI MATERIAL**, fichas con resumen editorial de ejecución, requisitos físicos y técnicos y enlace a CrossFit. La mayoría redirigen al índice oficial; los enlaces individuales se ofrecen solo cuando se verificaron.
-- **Para generar**, un ejercicio debe estar marcado como generable, quedar dentro del nivel, contar con **todos** los materiales seleccionados y **todas** las habilidades específicas habilitadas. Nunca se deduce saber Snatch por tener una barra, o por marcar el antiguo selector general `olympic`.
-- Barra + discos + habilidad `Snatch con barra` para Power Snatch y variantes. Sin barra o sin habilidad, no aparece. GHD Sit-up exige GHD y su habilidad propia; Wall Ball exige balón + diana. Mancuernas y kettlebells no habilitan sus variantes técnicas entre sí.
-- **No se generan** Reverse Crunch, Dead Bug, Hollow Hold, Mountain Climbers y accesorios similares: no se presentaban en el índice principal oficial. Los WODs antiguos que ya los contienen **no se reescriben ni se borran**.
-- Movimientos avanzados meramente técnicos figuran como **Solo referencia** y se excluyen del generador.
-- El sistema de presupuesto de fatiga de 1.0.9 y su configuración inicial (fatiga media / sin molestias / RPE 6–7) permanecen; no se promete predicción del RPE real.
+- **Modalidad aleatoria con memoria local de las 12 últimas generaciones.** Se favorecen formatos menos utilizados recientemente; se prueba otro formato cuando el primero no encuentra un WOD compatible. Si sólo uno es viable, puede repetirse. La modalidad elegida explícitamente por el usuario se respeta.
+- **Más estructuras de CrossFit:** se prueban circuitos con carrera/cardio, piernas, empuje, tracción, gimnasia y cargas dosificadas. No es obligatorio que cada entrenamiento incluya Sit-ups o comba.
+- **Menos repeticiones de WODs anteriores:** se penalizan los mismos movimientos, especialmente para una misma fecha. La novedad nunca tiene prioridad sobre la compatibilidad.
+- **Dosis mínima orientativa:** se rechazan estaciones cargadas cuya dosis resultaría testimonial; además se consideran los metros, calorías y segundos de manera distinta de las repeticiones.
+- **Límites adicionales de volumen técnico:** movimientos olímpicos y gimnasia compleja tienen topes de repeticiones por sesión, aparte del presupuesto general de patrones.
+- **AMRAP a ritmo productivo:** estimación de rondas con transiciones y pequeñas pausas, sin suponer una ronda adicional completa. Se indica el margen de 10–20 s por ronda en las instrucciones.
+- **TABATA:** si no caben tres bloques dentro de las restricciones, el motor evalúa dos o uno e informa de la duración efectiva (14, 9 o 4 minutos según el caso).
+- **FOR TIME en días de recuperación recomendada:** al confirmar la generación puede reducirse el CAP de 15 a 12 minutos, explicando el ajuste. Si no existe alternativa suficientemente productiva, informa de ello.
+- **Riesgo estimado más contextual:** no se etiqueta automáticamente como moderada-alta una propuesta sólo por usar buena parte del presupuesto numérico.
 
-## Instalación y validación
+## Se conserva de versiones anteriores
 
-1. Exporta la copia JSON desde Registro de v1.0.9; guárdala fuera de la app.
-2. Extrae y sube **10 archivos** (incluido el nuevo `catalog.mjs`) a la raíz de `generador-wod-beta` usando *Add file → Upload files*.
-3. Haz commit y abre la URL instalada con conexión, cierra y reabre. Comprueba `v1.0.10 BETA`.
-4. Comprueba en **Mi material** que las habilidades concretas están marcadas; el legado `olympic` no da permiso específico.
-5. Prueba sin barra y con habilidad Snatch: nunca debe salir Snatch con barra. Prueba con barra, discos pero sin habilidad: tampoco. Con todos los requisitos y nivel avanzado, sí puede formar parte de la lista elegible.
-6. Genera un Extra inteligente para 19, 20 y 22/11/2026. La programación ORIGIN se conserva localmente.
+- **Catálogo de 122 movimientos** y requisitos de material, nivel técnico y habilidad establecidos en 1.0.10. Los filtros se comprueban antes de la selección.
+- **Programación ORIGIN importada**, exactamente como fue cargada; el generador no sobrescribe los WODs oficiales.
+- Perfiles de material, habilidades, resultados, WODs anteriores, recuperaciones, copias de seguridad JSON y controles de fatiga/molestias/RPE.
+- La clave local `generador-wod-beta-v1`. El nuevo campo opcional `generationHistory` añade únicamente un registro compacto de las doce generaciones recientes y no requiere migración manual. Las copias antiguas siguen siendo legibles.
+- Independencia de la aplicación Contador WOD.
 
-## Notas
+## Instalación
 
-Las descripciones son recordatorios breves originales y no sustituyen las demostraciones oficiales, la enseñanza técnica ni los estándares de competición. Los ejercicios históricos se conservan. Los perfiles están almacenados localmente y no se sincronizan entre Safari normal, navegación privada e icono de inicio. No borres los datos del sitio ni desinstales antes de exportar copia.
+1. En la app actual, pulsa **Registro → Exportar copia JSON** y guarda el archivo fuera de Safari.
+2. Descomprime el ZIP de la versión 1.0.11 y sube **los diez archivos**, sin carpeta contenedora, a la raíz de `borjagrande/generador-wod-beta` en GitHub.
+3. Usa *Commit changes*. Abre la misma URL con internet, cierra completamente la aplicación del iPhone y vuelve a abrirla.
+4. Comprueba que aparece **v1.0.11 BETA**. No borres el icono ni los datos locales; no hace falta reimportar ORIGIN.
+5. En Generar, selecciona **Extra inteligente · Modalidad aleatoria · 22/11/2026 · Avanzado/RX · 15 minutos · Fatiga media · Sin molestias · RPE 6–7**. Genera cuatro WODs seguidos y observa formatos, ejercicios y advertencias.
+
+## Limitaciones y validación
+
+Los presupuestos por patrón y el RPE objetivo siguen siendo **heurísticas**, no medidas fisiológicas ni garantías de ausencia de interferencia. La biblioteca de ejercicios no sustituye supervisión técnica. La aplicación no cambia el nivel de habilidad ni marca automáticamente equipo; un ejercicio sin cualquiera de sus requisitos sigue bloqueado.
+
+Pruebas de la implementación: importación de 104 sesiones ORIGIN; matriz de niveles, formatos y estados de fatiga con aceptaciones/rechazos explícitos; comprobación de requisitos de barra/habilidad y conservación de datos; comprobación automatizada de la interfaz de generación, confirmación y persistencia de historial con navegador aislado. Sigue pendiente verificar la versión desplegada como PWA y su actualización de caché en un iPhone real.
+
+**Nota:** un día especialmente cargado puede ofrecer menos opciones, o exigir recuperar, aunque el usuario seleccione Aleatoria. El generador no inventa estímulos intensos ni incrementa cargas sólo para asegurar cuatro modalidades diferentes.
