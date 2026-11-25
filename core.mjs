@@ -1,7 +1,7 @@
-import {OFFICIAL_MOVEMENT_CATALOG,OFFICIAL_LIBRARY_URL} from './catalog.mjs?v=1.0.16';
+import {OFFICIAL_MOVEMENT_CATALOG,OFFICIAL_LIBRARY_URL} from './catalog.mjs?v=1.0.17';
 export {OFFICIAL_MOVEMENT_CATALOG,OFFICIAL_LIBRARY_URL};
 // Generador WOD beta — motor local, independiente de la interfaz y sin servicios externos.
-export const VERSION = '1.0.16-beta';
+export const VERSION = '1.0.17-beta';
 export const EQUIPMENT_GROUPS = [
  {title:'Máquinas',items:[['airbike','Assault / Echo Bike'],['bikeerg','BikeErg'],['skierg','SkiErg'],['rowerg','RowErg / remo'],['treadmill','Cinta de correr']]},
  {title:'Pesos y cargas',items:[['db','Mancuernas (DB)'],['kb','Kettlebells (KB)'],['barbell','Barra olímpica'],['plates','Discos bumper'],['rack','Rack para sentadillas'],['sandbag','Sandbag'],['wallball','Wall Ball'],['walltarget','Objetivo / diana para Wall Ball'],['slamball','Slam Ball'],['medball','Balón medicinal']]},
@@ -847,8 +847,8 @@ export function formatWhatsapp(w){
  if(w.kind==='recovery')return `*RECUPERACIÓN RECOMENDADA* · ${w.date}\n*No se propone WOD extra con carga*\n\n${w.movements.map((m,i)=>`${i+1}. ${m.amount} · ${m.name}`).join('\n')}\n\n*Motivo:* ${w.notes}\n*Intensidad:* ${w.intensity}\n\n${w.advice}`;
 
  const names={amrap:'AMRAP',fortime:'FOR TIME',emom:'EMOM',tabata:'TABATA'};
- const header=`*${w.forcedAgainstAdvice?'WOD EXTRA CON PRECAUCIÓN':w.strategy==='inteligente'?'WOD EXTRA INTELIGENTE':'WOD ALEATORIO'}*\n*${w.title}* · ${w.date}\nNivel: ${w.level} · Objetivo: ${w.objective}`;
- const movements=w.movements.map((m,i)=>w.mode==='tabata'?`Bloque ${i+1}: 8×20/10 · ${m.name}`:`${i+1}. ${m.amount} ${m.name}${w.mode==='emom'&&m.estimateSeconds?` (≈${m.estimateSeconds} s)`:''}`).join('\n');
+ const header=`*${w.edited?'WOD EDITADO MANUALMENTE':w.forcedAgainstAdvice?'WOD EXTRA CON PRECAUCIÓN':w.strategy==='inteligente'?'WOD EXTRA INTELIGENTE':'WOD ALEATORIO'}*\n*${w.title}* · ${w.date}\nNivel: ${w.level} · Objetivo: ${w.objective}`;
+ const movements=w.movements.map((m,i)=>w.mode==='tabata'?`Bloque ${i+1}: 8×20/10 · ${m.name}${w.edited?` · ${m.amount}`:''}`:`${i+1}. ${m.amount} ${m.name}${w.mode==='emom'&&m.estimateSeconds?` (≈${m.estimateSeconds} s)`:''}`).join('\n');
  return `${header}${w.forcedAgainstAdvice?'\n*AVISO:* Generado por confirmación expresa pese a recomendar recuperación.':''}\n\n${movements}\n\n*Formato:* ${w.advice}\n*Intensidad:* ${w.intensity}\n*Control de interferencias:* ${w.notes}\n\nRevisar cargas y escalados antes de entrenar.`;
 }
 export function toCSV(rows,headers){const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;return [headers.join(';'),...rows.map(r=>headers.map(h=>q(r[h])).join(';'))].join('\r\n');}
@@ -919,4 +919,86 @@ export function parseCounterTransfer(hash) {
  const summary=String(d.result||'').slice(0,180);
  if(!summary)throw new Error('El Contador no envió un resultado interpretable.');
  return {...d,result:summary};
+}
+
+// 1.0.17: ediciones explícitas, independientes de la selección automática.
+// Se estiman los nuevos volúmenes sin reutilizar la puntuación del WOD original.
+const EDIT_UNITS={reps:'reps',meters:'m',cals:'cal',sec:'s',climbs:'ascensos'};
+export function editorMovements(state,w,profile){
+ return MOVEMENTS.filter(m=>canGenerateMovement(m,profile,state.skills,w.level)&&
+   (w.mode!=='tabata'||(w.strategy==='inteligente'?EXTRA_TABATA:TABATA_SAFE).has(m.id)));
+}
+export function editWod(original,draft,state,profile){
+ if(!original||original.kind==='recovery'||!['amrap','fortime','emom','tabata'].includes(original.mode))throw new Error('No hay un WOD editable.');
+ const mode=original.mode, smart=original.strategy==='inteligente';
+ const integer=(v,min,max,label)=>{if(v===''||!Number.isInteger(Number(v))||Number(v)<min||Number(v)>max)throw new Error(`${label}: introduce un entero entre ${min} y ${max}.`);return Number(v)};
+ const optional=(v,max,label)=>{if(v===''||v==null)return null;const n=Number(v);if(!Number.isFinite(n)||n<0||n>max)throw new Error(`${label}: introduce un valor entre 0 y ${max}.`);return n;};
+ const rows=draft.movements||[],limit=mode==='tabata'?6:8;
+ if(!Array.isArray(rows)||rows.length<1||rows.length>limit)throw new Error(`Añade entre 1 y ${limit} movimientos.`);
+ const readiness=normalizeReadiness(original.readiness||state.readiness),stress=getStress(state.plan,state.logs,original.date),assessment=assessIntelligentDay(stress);
+ const {budgets}=getPatternBudgets(state,original.date,stress,readiness,assessment);
+ const warnings=[], allowed=new Map(editorMovements(state,original,profile).map(m=>[m.id,m]));
+ let duration,rounds=null,interval=0,tabata,cap;
+ if(mode==='tabata'){
+  // Mantiene los bloques estándar compatibles con el Contador 2.2.3.
+  const pause=rows.length===1?0:integer(draft.pause,0,600,'Pausa entre bloques');
+  tabata={blocks:rows.length,roundsPerBlock:8,workSeconds:20,restSeconds:10,betweenBlocksSeconds:pause};
+  rounds=rows.length*8;interval=30;duration=(rows.length*240+(rows.length-1)*pause)/60;
+ }else{
+  duration=integer(draft.duration,1,mode==='amrap'?180:mode==='fortime'?60:120,mode==='fortime'?'CAP':'Duración');
+  if(mode==='fortime')rounds=integer(draft.rounds,1,100,'Rondas');
+  if(mode==='emom'){
+   interval=integer(draft.interval,10,600,'Intervalo');
+   if(duration*60%interval||duration*60/interval>120)throw new Error('El tiempo debe contener entre 1 y 120 intervalos completos.');
+   if(duration*60/interval<rows.length)throw new Error('Debe haber al menos un intervalo por estación.');
+  }
+ }
+ cap=duration;
+ const moves=rows.map((r,i)=>{
+  const m=allowed.get(r.id);if(!m)throw new Error(`Movimiento ${i+1}: no disponible para el material, nivel, habilidades o formato seleccionados.`);
+  const units=mode==='tabata'?20:integer(r.units,1,m.unit==='meters'?50000:m.unit==='sec'?3600:1000,`Cantidad de ${m.name}`);
+  const kg=optional(r.kg,400,`Peso de ${m.name}`),height=optional(r.height,1000,`Altura de ${m.name}`);
+  if(kg!==null&&!isLoaded(m)&&!m.req.includes('slamball'))throw new Error(`${m.name}: el catálogo no especifica carga externa.`);
+  if(kg!==null)for(const id of m.req.filter(x=>['db','kb','barbell','wallball','sandbag','medball','slamball'].includes(x))){
+   const max=profile.equipment[id]?.load;if(max!==''&&max!=null&&Number(max)>0&&kg>Number(max))throw new Error(`${m.name}: el peso supera el máximo del perfil (${max} kg).`);
+  }
+  if(height!==null&&!m.req.some(x=>['box','walltarget','wall','ropeclimb','rig','rings'].includes(x)))throw new Error(`${m.name}: el catálogo no especifica una altura de material.`);
+  if(smart&&!candidateAllowed109(m,stress,mode,readiness,assessment))warnings.push(`${m.name}: el filtro inteligente actual desaconseja este movimiento.`);
+  const estimateSeconds=mode==='tabata'?20:Math.max(1,estimateStationSeconds110(m,units,units*(m.unit==='climbs'?15:3)));
+  const amount=(mode==='tabata'?'20 s (máx. reps / trabajo)':`${units} ${EDIT_UNITS[m.unit]}`)+(kg===null?'':` · ${kg} kg`)+(height===null?'':` · ${height} cm`);
+  return {...m,units,amount,estimateSeconds,editKg:kg,editHeight:height,...(mode==='tabata'?{block:i+1}:{})};
+ });
+ const sums=moves.reduce((s,m)=>s+m.estimateSeconds,0), n=moves.length;
+ let counts,elapsed;
+ if(mode==='fortime'){counts=moves.map(()=>rounds);elapsed=(sums+n*6)*rounds;}
+ else if(mode==='emom'){const total=duration*60/interval;counts=moves.map((_,i)=>Math.floor(total/n)+(i<total%n?1:0));elapsed=duration*60;
+  moves.forEach(m=>{if(m.estimateSeconds>=interval)warnings.push(`${m.name}: el trabajo estimado ocupa o supera su intervalo.`);else if(m.estimateSeconds>interval*.77)warnings.push(`${m.name}: queda poco margen de descanso en su intervalo.`);});}
+ else if(mode==='tabata'){counts=moves.map(()=>1);elapsed=duration*60;}
+ else {counts=moves.map(()=>duration*60/(sums+n*6+15));elapsed=duration*60;}
+ const costs=mergeCosts(moves.map((m,i)=>patternDose109(m,m,counts[i],mode)));
+ const ratios=Object.entries(costs).map(([p,v])=>v/Math.max(.01,budgets[p]??5));
+ const budgetUse=Math.round(Math.max(0,...ratios)*100);
+ const domains=[...new Set(moves.map(stimulusDomain))];
+ if(smart){
+  if(!state.plan.length||!state.plan.some(p=>Math.abs(daysApart(p.date,original.date))<=2))warnings.push('No consta programación oficial cercana: contexto insuficiente para valorar interferencias.');
+  if(assessment.shouldRecover)warnings.push(assessment.reason);
+  const over=Object.entries(costs).filter(([p,v])=>v>(budgets[p]??5)*1.001);
+  if(over.length)warnings.push(`Presupuesto superado: ${over.map(([p])=>PATTERN_NAMES[p]||p).join(', ')}.`);
+  if(moves.some(m=>m.editKg!==null||m.editHeight!==null))warnings.push('El cálculo relativo no incorpora los kilos ni la altura introducidos; revisa manualmente su impacto.');
+ }
+ if(mode==='fortime'&&elapsed>cap*60)warnings.push('El tiempo estimado supera el CAP.');
+ const expectedMinutes=Math.round(elapsed/6)/10;
+ const interference=smart?(warnings.length?'Requiere revisión':'Dentro de los presupuestos relativos (orientativo)'):'No evaluada en modo libre';
+ const name=String(draft.name||'').trim().slice(0,65),extraNotes=String(draft.notes||'').trim().slice(0,500);
+ const fmt=formatMinutes(duration);
+ const base=mode==='fortime'?`FOR TIME · CAP ${fmt}'`:mode==='amrap'?`AMRAP ${fmt}'`:mode==='emom'?`EMOM ${fmt}'`:`TABATA ${fmt}'`;
+ const title=name?`${base} · ${name}`:base;
+ const advice=mode==='fortime'?`${rounds} rondas por tiempo (CAP ${cap}'). Tiempo estimado orientativo: ${formatMinutes(expectedMinutes)} min.`:mode==='amrap'?`Máximas rondas y repeticiones en ${fmt} minutos.`:mode==='emom'?`${duration*60/interval} intervalos de ${interval} s, alternando ${n} estaciones.`:`${n} bloques de 8×(20 s trabajo / 10 s descanso)${n>1?`, ${tabata.betweenBlocksSeconds} s entre bloques`:''}. Duración total ${fmt} min.`;
+ const costText=Object.entries(costs).sort((a,b)=>b[1]-a[1]).map(([p,v])=>`${PATTERN_NAMES[p]||p}: ${v.toFixed(1)}${smart?`/${(budgets[p]??5).toFixed(1)}`:''}`).join('; ');
+ const notes=`Edición manual: no validada por la selección automática. Carga relativa estimada: ${costText}. ${smart?'Comparada con programación y resultados registrados. ':'Modo libre: sin validación de interferencias. '}${warnings.length?'Avisos: '+warnings.join(' '):''} Las cargas y alturas son prescripciones, no ajustes del modelo; no se garantiza el RPE ni la seguridad.${extraNotes?' Notas del atleta: '+extraNotes:''}`;
+ const edited={...original,id:original.id,kind:'wod',title,mode,duration,cap,rounds,interval,tabata,movements:moves,patterns:[...new Set(moves.flatMap(m=>m.patterns))],profileName:profile.name,advice,notes,edited:true,editName:name,editNotes:extraNotes,objective:original.requestedObjective||original.objective,readiness:smart?readiness:original.readiness,
+  stimulusReport:{domains,interference,budgetUse:smart?budgetUse:null,expectedMinutes,advice:'Estimación manual sin puntuación de generación automática.'}, editWarnings:warnings,editedFrom:original.id};
+ // Valida el mismo protocolo que se usa al pulsar Abrir contador WOD.
+ contadorUrlForWod(edited);
+ return {wod:edited,warnings,costs,budgets:smart?budgets:null,expectedMinutes};
 }

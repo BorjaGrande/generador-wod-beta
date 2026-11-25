@@ -1,5 +1,5 @@
-import {VERSION,EQUIPMENT_GROUPS,SKILLS,MOVEMENTS,OFFICIAL_MOVEMENT_CATALOG,OFFICIAL_LIBRARY_URL,unavailableRequirements,canGenerateMovement,PATTERN_NAMES,DEFAULT_STATE,sanitizeState,normalizeReadiness,isISODate,daysApart,getStress,generateWod,parsePlanCSV,formatWhatsapp,toCSV,contadorUrlForWod,parseCounterTransfer} from './core.mjs?v=1.0.16';
-import {analyzeTrainingResults} from './analytics.mjs?v=1.0.16';
+import {VERSION,EQUIPMENT_GROUPS,SKILLS,MOVEMENTS,OFFICIAL_MOVEMENT_CATALOG,OFFICIAL_LIBRARY_URL,unavailableRequirements,canGenerateMovement,PATTERN_NAMES,DEFAULT_STATE,sanitizeState,normalizeReadiness,isISODate,daysApart,getStress,generateWod,parsePlanCSV,formatWhatsapp,toCSV,contadorUrlForWod,parseCounterTransfer,editorMovements,editWod} from './core.mjs?v=1.0.17';
+import {analyzeTrainingResults} from './analytics.mjs?v=1.0.17';
 const STORAGE_KEY='generador-wod-beta-v1';
 // La etiqueta de versión depende del motor importado, no sólo del HTML.
 document.querySelector('.version').textContent=`v${VERSION.replace('-beta',' BETA')}`;
@@ -163,10 +163,10 @@ function renderWod(w){
   const actions=node('div',null,'wod-actions');actions.append(shareWodButton(w,'Compartir recomendación'),btn('Generar de todos modos',()=>askRecoveryConfirmation(pendingRecoveryOptions),'caution-action'));panel.append(actions);
   return;
  }
- panel.append(node('div',w.forcedAgainstAdvice?'WOD EXTRA CON PRECAUCIÓN':w.strategy==='inteligente'?'WOD EXTRA INTELIGENTE':'WOD LIBRE','wod-kicker'),node('h2',w.title,'wod-title'));
+ panel.append(node('div',w.edited?'WOD EDITADO MANUALMENTE':w.forcedAgainstAdvice?'WOD EXTRA CON PRECAUCIÓN':w.strategy==='inteligente'?'WOD EXTRA INTELIGENTE':'WOD LIBRE','wod-kicker'),node('h2',w.title,'wod-title'));
  if(w.forcedAgainstAdvice)panel.append(node('p','Se ha generado a petición tuya pese a recomendar recuperación. La selección busca un estímulo útil con dosis controladas. No garantiza compatibilidad: ajusta el peso y el ritmo a tus sensaciones.','wod-info')); 
  const tags=node('div');for(const t of [w.date,w.level,w.objective,w.profileName])tags.append(node('span',t,'tag'));panel.append(tags);
- for(const m of w.movements){const line=node('div',null,'wod-movement');const label=w.mode==='tabata'?(`BLOQUE ${m.block||w.movements.indexOf(m)+1}`):m.amount;const detail=w.mode==='tabata'?(`${m.name} · 8×(20/10)`):w.mode==='emom'&&m.estimateSeconds?`${m.name} · ≈${m.estimateSeconds} s de trabajo`:m.name;line.append(node('div',label,'wod-amount'),node('div',detail,'wod-name'));
+ for(const m of w.movements){const line=node('div',null,'wod-movement');const label=w.mode==='tabata'?(`BLOQUE ${m.block||w.movements.indexOf(m)+1}`):m.amount;const detail=w.mode==='tabata'?(`${m.name} · 8×(20/10)${w.edited?` · ${m.amount}`:''}`):w.mode==='emom'&&m.estimateSeconds?`${m.name} · ≈${m.estimateSeconds} s de trabajo`:m.name;line.append(node('div',label,'wod-amount'),node('div',detail,'wod-name'));
   const ref=OFFICIAL_MOVEMENT_CATALOG.find(x=>x.id===m.id);
   if(ref){const a=node('a',ref.sourceUrl===OFFICIAL_LIBRARY_URL?'Biblioteca de movimientos':'Ver técnica / vídeo oficial','catalog-official');a.href=ref.sourceUrl;a.target='_blank';a.rel='noopener noreferrer';line.append(a);}
   panel.append(line)}
@@ -179,6 +179,7 @@ function renderWod(w){
  actions.append(timer);
  actions.append(shareWodButton(w));
  actions.append(btn('Guardar WOD',()=>{if(!state.wods.some(x=>x.id===w.id))state.wods.push(w);save();renderLogWodOptions();notice('WOD guardado para registrar resultados.');},'ghost'));
+ actions.append(btn('Editar WOD',()=>openWodEditor(w),'ghost'));
  panel.append(actions);
 }
 function renderLogWodOptions(){const select=$('log-wod');const prev=select.value;select.replaceChildren();const unique=[...(pendingCounterResult?.fallbackWod?[pendingCounterResult.fallbackWod]:[]),...(state.lastWod?[state.lastWod]:[]),...state.wods].filter((w,i,arr)=>arr.findIndex(x=>x.id===w.id)===i).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));if(!unique.length){select.append(option('','Primero genera un WOD'));return}for(const w of unique)select.append(option(w.id,`${w.date} · ${w.title} (${w.strategy})`));if(unique.some(w=>w.id===prev))select.value=prev;}
@@ -340,3 +341,73 @@ function renderAll(){renderProfiles();renderInventory();renderCatalog();renderRe
 function connection(){const offline=!navigator.onLine;$('connectivity').textContent=offline?'Sin conexión · datos locales':'Con conexión · datos locales'}window.addEventListener('online',connection);window.addEventListener('offline',connection);
 const date=now();$('wod-date').value=date;$('plan-form').elements.date.value=date;$('log-form').elements.date.value=date;renderAll();connection();importCounterResultFromHash();
 if('serviceWorker' in navigator && location.protocol==='https:')navigator.serviceWorker.register('./sw.js').catch(err=>console.warn('No se pudo activar modo offline:',err));
+
+// Editor transaccional: el WOD original no cambia hasta aplicar los cambios.
+function openWodEditor(original){
+ const profile=getProfile();
+ const catalog=editorMovements(state,original,profile).sort((a,b)=>a.name.localeCompare(b.name,'es'));
+ const byId=new Map(catalog.map(m=>[m.id,m]));
+ const mode=original.mode,max=mode==='tabata'?6:8;
+ const unitLabels={reps:'Repeticiones',meters:'Distancia (m)',cals:'Calorías',sec:'Tiempo (s)',climbs:'Ascensos'};
+ const draft={duration:original.duration,rounds:original.rounds||3,interval:original.interval||60,pause:original.tabata?.betweenBlocksSeconds||0,name:original.editName||'',notes:original.editNotes||'',movements:original.movements.map(m=>({id:m.id,units:Number.parseFloat(m.amount)||m.units||10,kg:m.editKg??'',height:m.editHeight??''}))};
+ const dialog=node('dialog',null,'editor-dialog');dialog.setAttribute('aria-label','Editar WOD');
+ const header=node('div',null,'editor-head');header.append(node('h2','Editar WOD'),btn('Cancelar',()=>dialog.close(),'ghost small'));dialog.append(header,node('p',`Formato: ${mode.toUpperCase()} · Material: ${profile.name}. El original no se modifica hasta aplicar.`,'hint'));
+ const settings=node('div',null,'form-grid');
+ function field(parent,label,value,onChange,config={}){
+  const l=node('label',label);if(config.full)l.classList.add('full');
+  const input=node(config.textarea?'textarea':'input');if(!config.textarea)input.type=config.type||'number';
+  if(config.min!==undefined)input.min=config.min;if(config.max!==undefined)input.max=config.max;if(config.step!==undefined)input.step=config.step;if(config.length)input.maxLength=config.length;
+  if(config.textarea)input.rows=2;input.value=value??'';
+  input.addEventListener('input',()=>{onChange(input.value);refresh()});l.append(input);parent.append(l);return input;
+ }
+ if(mode!=='tabata')field(settings,mode==='fortime'?'CAP (min)':'Duración (min)',draft.duration,v=>draft.duration=v,{min:1,max:mode==='amrap'?180:mode==='fortime'?60:120});
+ if(mode==='fortime')field(settings,'Rondas',draft.rounds,v=>draft.rounds=v,{min:1,max:100});
+ if(mode==='emom')field(settings,'Intervalo (s)',draft.interval,v=>draft.interval=v,{min:10,max:600});
+ if(mode==='tabata')field(settings,'Pausa entre bloques (s)',draft.pause,v=>draft.pause=v,{min:0,max:600});
+ field(settings,'Nombre opcional',draft.name,v=>draft.name=v,{type:'text',full:true,length:65});
+ dialog.append(settings,node('h3',mode==='tabata'?'Bloques · 8×20/10':'Movimientos'));
+ const list=node('div',null,'editor-list');dialog.append(list);
+ function defaultRow(m){return {id:m.id,units:mode==='tabata'?20:m.unit==='meters'?100:m.unit==='sec'?30:m.unit==='cals'?8:m.unit==='climbs'?1:8,kg:'',height:''};}
+ const add=btn('Añadir movimiento',()=>{if(!catalog.length||draft.movements.length>=max)return;draft.movements.push(defaultRow(catalog[0]));renderRows();refresh()},'ghost');dialog.append(add);
+ const noteGrid=node('div',null,'form-grid');field(noteGrid,'Notas del entrenamiento',draft.notes,v=>draft.notes=v,{textarea:true,full:true,length:500});dialog.append(noteGrid);
+ const preview=node('div',null,'editor-preview');preview.setAttribute('aria-live','polite');dialog.append(preview);
+ const apply=btn('Aplicar cambios',()=>{
+  let result;try{result=editWod(original,draft,state,profile);}catch(err){refresh();return;}
+  if(result.warnings.length&&!confirm('La edición tiene avisos de compatibilidad o duración. No está validada por el algoritmo. ¿Aplicar igualmente?\n\n'+result.warnings.join('\n')))return;
+  // Nuevo identificador para no alterar resultados previos. Conserva el original si estaba guardado.
+  const id=`wod-${Date.now()}-${Math.floor(Math.random()*1e9)}`;
+  const w={...result.wod,id,createdAt:new Date().toISOString()};
+  state.lastWod=w;state.lastRecommendation=null;save();dialog.close();renderWod(w);renderLogWodOptions();notice('WOD editado. Revisa los avisos antes de entrenar.');
+ },'primary');
+ const actions=node('div',null,'editor-actions');actions.append(apply,btn('Cancelar cambios',()=>dialog.close(),'ghost'));dialog.append(actions);
+ function refresh(){
+  preview.replaceChildren();try{
+   const r=editWod(original,draft,state,profile);apply.disabled=false;
+   preview.append(node('strong',`Duración programada: ${Number(r.wod.duration.toFixed(2))} min`));
+   if(mode==='fortime')preview.append(node('p',`Tiempo estimado: ${r.expectedMinutes} min · CAP ${r.wod.cap} min`));
+   if(mode==='emom')preview.append(node('p',r.wod.advice));
+   preview.append(node('p',r.wod.notes));
+   if(r.warnings.length)preview.classList.add('editor-warning');else preview.classList.remove('editor-warning');
+  }catch(err){apply.disabled=true;preview.classList.add('editor-warning');preview.append(node('strong',err.message));}
+ }
+ function renderRows(){
+  list.replaceChildren();draft.movements.forEach((r,i)=>{
+   const row=node('div',null,'editor-movement');const controls=node('div',null,'editor-row-head');controls.append(node('strong',`${mode==='tabata'?'Bloque':'Movimiento'} ${i+1}`));
+   const up=btn('↑',()=>{[draft.movements[i-1],draft.movements[i]]=[draft.movements[i],draft.movements[i-1]];renderRows();refresh()},'ghost small');up.disabled=i===0;up.setAttribute('aria-label',`Subir movimiento ${i+1}`);
+   const down=btn('↓',()=>{[draft.movements[i],draft.movements[i+1]]=[draft.movements[i+1],draft.movements[i]];renderRows();refresh()},'ghost small');down.disabled=i===draft.movements.length-1;down.setAttribute('aria-label',`Bajar movimiento ${i+1}`);
+   controls.append(up,down);row.append(controls);
+   const grid=node('div',null,'form-grid');const l=node('label','Ejercicio','full');const select=node('select');
+   if(!byId.has(r.id))select.append(option(r.id,`${original.movements.find(m=>m.id===r.id)?.name||r.id} · No disponible`));
+   for(const m of catalog)select.append(option(m.id,m.name));select.value=r.id;
+   select.addEventListener('change',()=>{const m=byId.get(select.value);if(m){draft.movements[i]=defaultRow(m);renderRows();refresh()}});l.append(select);grid.append(l);
+   const m=byId.get(r.id)||original.movements.find(x=>x.id===r.id);
+   if(mode!=='tabata')field(grid,unitLabels[m?.unit]||'Cantidad',r.units,v=>r.units=v,{min:1,max:m?.unit==='meters'?50000:m?.unit==='sec'?3600:1000});
+   if(m?.req?.some(x=>['db','kb','barbell','sandbag','medball','wallball','slamball'].includes(x)))field(grid,'Peso (kg, opcional)',r.kg,v=>r.kg=v,{min:0,max:400,step:'0.5'});
+   if(m?.req?.some(x=>['box','walltarget','wall','ropeclimb','rig','rings'].includes(x)))field(grid,'Altura (cm, opcional)',r.height,v=>r.height=v,{min:0,max:1000,step:'1'});
+   row.append(grid);
+   const tools=node('div',null,'editor-row-tools');const duplicate=btn('Duplicar',()=>{draft.movements.splice(i+1,0,{...r});renderRows();refresh()},'ghost small');duplicate.disabled=draft.movements.length>=max;
+   const remove=btn('Eliminar',()=>{draft.movements.splice(i,1);renderRows();refresh()},'danger-ghost small');remove.disabled=draft.movements.length<=1;tools.append(duplicate,remove);row.append(tools);list.append(row);
+  });add.disabled=draft.movements.length>=max||!catalog.length;
+ }
+ dialog.addEventListener('close',()=>dialog.remove());document.body.append(dialog);renderRows();refresh();dialog.showModal();
+}

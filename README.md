@@ -1,3 +1,37 @@
+# Generador WOD · 1.0.17 Beta — Editor de WODs
+
+Actualización incremental sobre el ZIP 1.0.16 Beta suministrado. No modifica el repositorio del Contador WOD, ni el algoritmo de selección automática, ni la clave de almacenamiento local `generador-wod-beta-v1`.
+
+## Editor
+
+Después de generar un WOD, pulsa **Editar WOD** (debajo de Abrir contador WOD, Compartir WOD y Guardar WOD). El editor permite:
+
+- Cambiar duración AMRAP, CAP y rondas FOR TIME, duración e intervalo EMOM, bloques TABATA y pausa entre bloques. Se mantiene el estándar TABATA de 8 × 20/10 por bloque.
+- Sustituir, añadir, eliminar, duplicar y reordenar movimientos mediante flechas. Se usa el catálogo existente y el perfil de material activo; únicamente aparecen movimientos disponibles para el nivel, habilidades, material y formato. Límite: 8 movimientos o 6 bloques TABATA por compatibilidad con el protocolo del Contador.
+- Editar la cantidad según la unidad propia del ejercicio (repeticiones, metros, calorías, segundos o ascensos). Peso y altura son atributos opcionales cuando el catálogo identifica material adecuado. En TABATA se mantiene el trabajo por tiempo, no un objetivo de repeticiones fijo.
+- Añadir nombre y notas. Consultar una estimación recalculada de carga relativa por patrón y tiempo; en modo inteligente, comprobar presupuestos y avisos según programación oficial, resultados y estado previo.
+- Aplicar o cancelar. Aplicar asigna un identificador nuevo al WOD; no modifica los WOD guardados ni los registros anteriores. La edición pasa a ser el último WOD local y puede guardarse expresamente, compartirse o abrir el Contador con la nueva configuración.
+
+## Límites y decisiones
+
+- No se cambia de formato dentro del editor en esta fase. Los atributos de cantidad se mantienen en la unidad del catálogo. La búsqueda avanzada y sustituciones inteligentes se dejan para la fase de biblioteca.
+- Una edición manual no ha pasado por el optimizador de selección: se elimina su puntuación anterior y se muestra su nueva estimación. Los avisos de interferencia o tiempo requieren confirmación explícita; no se garantiza compatibilidad ni RPE. Los kilos y altura se conservan y se incluyen en texto y transferencia; no están incorporados cuantitativamente al modelo de carga. El modo libre no evalúa interferencias. Las estimaciones de ritmo son orientativas.
+- El perfil de material activo se muestra en el editor. Se mantiene el estado previo del WOD inteligente. No se altera ORIGIN ni se cuentan WODs editados como realizados.
+
+## Instalación y validación
+
+1. Exportar copia JSON desde Registro y conservarla de forma privada.
+2. Descomprimir este ZIP. Subir los 11 archivos a la raíz del repositorio beta del Generador, conservando los nombres; confirmar el commit. No subir la copia JSON.
+3. Abrir con conexión, cerrar completamente y abrir de nuevo. Confirmar que la cabecera indica **v1.0.17 BETA**. No borrar datos ni eliminar la PWA.
+4. Generar un AMRAP, cambiar duración y dosis, añadir/duplicar/reordenar/eliminar un ejercicio. Cancelar y comprobar que el original sigue igual; volver a editar y aplicar. Compartir, guardar y abrir el Contador con el tiempo nuevo.
+5. Repetir con FOR TIME (CAP y rondas), EMOM (intervalos completos) y TABATA (bloques y pausas). Verificar un WOD inteligente con avisos, la persistencia tras cerrar la app y los registros anteriores.
+
+**Pruebas realizadas:** sintaxis JS y pruebas del motor para los cuatro formatos, enlace de configuración, texto compartido, conservación de datos, cantidades, peso máximo, altura, intervalos incompatibles y avisos de presupuesto. La prueba automatizada en navegador no pudo ejecutarse debido al bloqueo de navegación del entorno. Falta la validación funcional en iPhone y la comprobación del enlace real con Contador 2.2.3. No se ha publicado en GitHub.
+
+---
+
+## Notas históricas de la versión 1.0.16
+
 # Generador WOD · 1.0.16 Beta — Corrección de bloqueos y análisis de resultados
 
 Actualización incremental de `1.0.15`, compatible con el **Contador WOD 2.2.3**, sin cambios en su repositorio ni en el protocolo de enlace.
