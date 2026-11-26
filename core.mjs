@@ -1,7 +1,7 @@
-import {OFFICIAL_MOVEMENT_CATALOG,OFFICIAL_LIBRARY_URL} from './catalog.mjs?v=1.0.17';
+import {OFFICIAL_MOVEMENT_CATALOG,OFFICIAL_LIBRARY_URL} from './catalog.mjs?v=1.0.18';
 export {OFFICIAL_MOVEMENT_CATALOG,OFFICIAL_LIBRARY_URL};
 // Generador WOD beta — motor local, independiente de la interfaz y sin servicios externos.
-export const VERSION = '1.0.17-beta';
+export const VERSION = '1.0.18-beta';
 export const EQUIPMENT_GROUPS = [
  {title:'Máquinas',items:[['airbike','Assault / Echo Bike'],['bikeerg','BikeErg'],['skierg','SkiErg'],['rowerg','RowErg / remo'],['treadmill','Cinta de correr']]},
  {title:'Pesos y cargas',items:[['db','Mancuernas (DB)'],['kb','Kettlebells (KB)'],['barbell','Barra olímpica'],['plates','Discos bumper'],['rack','Rack para sentadillas'],['sandbag','Sandbag'],['wallball','Wall Ball'],['walltarget','Objetivo / diana para Wall Ball'],['slamball','Slam Ball'],['medball','Balón medicinal']]},
@@ -149,7 +149,7 @@ export function eligibleMovements(profile,skills=[],level='intermedio'){
 const MAIN_PATTERNS=['squat','hinge','overhead'];
 const TABATA_SAFE=new Set(['airsquat','burpees','pushups','absitups','situps','singles','doubles','boxsteps','row','bike','bikeerg','ski','kbswing','walkinglunge']);
 // Estimaciones aproximadas para construir estaciones de 25–45 s; no son predicciones individuales.
-const SEC_PER_REP={absitups:2.7,ghdsitups:3.5,walkinglunge:2.4,overheadsquat:4.5,hangpowersnatch:5.0,hangpowerclean:5.0,dbfrontsquat:3.5,dbpowerclean:3.9,dbhangpowerclean:3.6,burpeebox:5.5,airsquat:1.9,lunges:2.4,burpees:4.6,pushups:2.7,situps:2.7,
+const SEC_PER_REP={hrpushup:3.5,burpeepullup:8,boxjumpover:4.5,boxstepover:4,dblateralstep:4,kbgoblet:3.5,kbdeadlift:3,dbrow:4,reverse_lunge:2.8,absitups:2.7,ghdsitups:3.5,walkinglunge:2.4,overheadsquat:4.5,hangpowersnatch:5.0,hangpowerclean:5.0,dbfrontsquat:3.5,dbpowerclean:3.9,dbhangpowerclean:3.6,burpeebox:5.5,airsquat:1.9,lunges:2.4,burpees:4.6,pushups:2.7,situps:2.7,
  mountain:1.2,jumping:1.0,dbsnatch:3.6,dbthruster:4.2,dbdeadlift:2.8,
  dbpushpress:3.3,dblob:3.8,kbswing:2.8,kbgoblet:2.9,kbdeadlift:2.9,kbclean:3.7,
  deadlift:4.0,frontsquat:4.0,backsquat:4.2,powerclean:5.0,powersnatch:5.0,
@@ -192,6 +192,7 @@ export function makeAmount(m,mode,duration,level){
  if(m.id==='mountain')amount=level==='principiante'?24:level==='avanzado'?45:36;
  if(m.id==='singles')amount=level==='principiante'?30:level==='avanzado'?60:45;
  if(m.id==='doubles')amount=level==='avanzado'?35:20;
+ if(m.id==='shuttle')amount=100;
  if(m.id==='running')amount=mode==='fortime'?200:150;
  if(mode==='fortime'&&m.unit==='reps'&&!LOW_REP_CAP.has(m.id))amount=Math.max(5,Math.round(amount*1.15));
  return `${amount} ${m.unit==='meters'?'m':m.unit==='cals'?'cal':m.unit==='sec'?'s':m.unit==='climbs'?'ascensos':'reps'}`;
@@ -280,11 +281,11 @@ function safeSmartAmount(m,mode,duration,level,stress){
 // ya NO se incorpora al pool de generación. Se preserva sólo en WODs históricos.
 const SUPPLEMENTARY_CORE = [];
 const CORE_FAMILY={situps:'flexión',absitups:'flexión',ghdsitups:'flexión',lsit:'estabilidad',ttb:'suspensión',kippingttb:'suspensión',hanglsit:'estabilidad'};
-const EXTRA_COMPLEX_EXCLUDED=new Set([
+const EXTRA_COMPLEX_EXCLUDED=new Set(['burpeepullup',
  'deadlift','frontsquat','backsquat','powerclean','powersnatch','barthruster','pushpress',
  'wallballs','sled','ropeclimb','bmu','rmu','hspu','dbsnatch','dbthruster','dbpushpress','ghdsitups','kbsnatch'
 ]);
-const EXTRA_IMPACT=new Set(['running','shuttle','boxjumps','burpees','mountain','doubles']);
+const EXTRA_IMPACT=new Set(['burpeepullup','boxjumpover','running','shuttle','boxjumps','burpees','mountain','doubles']);
 const EXTRA_EXPLOSIVE=new Set(['kbswing','medball','sandbag']);
 const EXTRA_TABATA=new Set(['absitups','situps','singles','airsquat','pushups','bike','bikeerg','row','ski','walkinglunge','boxsteps']);
 function chooseFrom(items,rng){
@@ -458,7 +459,7 @@ function estimateStationSeconds110(m,units,approx){
  // Estimaciones conservadoras de tiempo de estación, no cronometrajes individuales.
  if(m.id==='running')return Math.round(units/3.0);
  if(m.id==='shuttle')return Math.round(units/2.4);
- if(m.id==='dbcarry')return Math.round(units/1.25);
+ if(['dbcarry','kbcarry','dbsuitcase','sandbagcarry'].includes(m.id))return Math.round(units/1.25);
  if(m.id==='handstandwalk')return Math.round(units/0.8);
  if(m.id==='singles')return Math.round(units*0.64);
  if(m.id==='doubles')return Math.round(units*0.85);
@@ -646,7 +647,7 @@ function createCandidateSelection109(pool,template,stress,rng,state,date){
 function buildOptimizedExtra({state,mode,date,level,objective,duration,requestedDuration=duration,profile,stress,assessment,rng,effort,readiness,forcedAgainstAdvice}){
  const effortCfg={controlado:{rpe:'5–6',name:'controlado'},productivo:{rpe:'6–7',name:'productivo'},exigente:{rpe:'7–8',name:'exigente'}}[effort];
  const supplementary=SUPPLEMENTARY_CORE.filter(m=>level!=='principiante'||m.tier===1);
- const excludeFromExtra=new Set(['goodmorning','zerchersquat','benchpress','snatchbalance','dbturkish']);
+ const excludeFromExtra=new Set(['goodmorning','zerchersquat','benchpress','snatchbalance','dbturkish','burpeepullup','boxjumpover']);
  const pool=[...eligibleMovements(profile,state.skills,level),...supplementary].filter(m=>!excludeFromExtra.has(m.id)&&candidateAllowed109(m,stress,mode,readiness,assessment));
  const {budgets,weekly}=getPatternBudgets(state,date,stress,readiness,assessment);
  const domainCount=new Set(pool.map(stimulusDomain)).size;
@@ -921,7 +922,7 @@ export function parseCounterTransfer(hash) {
  return {...d,result:summary};
 }
 
-// 1.0.17: ediciones explícitas, independientes de la selección automática.
+// 1.0.18: ediciones explícitas, independientes de la selección automática.
 // Se estiman los nuevos volúmenes sin reutilizar la puntuación del WOD original.
 const EDIT_UNITS={reps:'reps',meters:'m',cals:'cal',sec:'s',climbs:'ascensos'};
 export function editorMovements(state,w,profile){
@@ -1001,4 +1002,17 @@ export function editWod(original,draft,state,profile){
  // Valida el mismo protocolo que se usa al pulsar Abrir contador WOD.
  contadorUrlForWod(edited);
  return {wod:edited,warnings,costs,budgets:smart?budgets:null,expectedMinutes};
+}
+
+// 1.0.18: búsquedas y alternativas heurísticas, sin cambiar automáticamente el WOD.
+const MOVEMENT_ALIASES={pullups:'pull up dominada dominadas strict pu',kippingpullup:'pull up dominada kpu',butterflypullup:'pull up dominada bpu',c2b:'c2b ct b ctb chest to bar dominada',kippingc2b:'c2b ctb chest to bar dominada',ttb:'t2b ttb toes to bar',kippingttb:'t2b ttb toes to bar',hspu:'hspu handstand push up',stricthspu:'hspu strict',chestwallhspu:'hspu',deficithspu:'hspu',freestandinghspu:'hspu',handstandwalk:'hsw handstand walk caminar manos',wallwalk:'ww wall walk',doubles:'du comba dobles double unders',singles:'su comba simples single unders',bmu:'bmu mu muscle up',strictbmu:'bmu mu muscle up',rmu:'rmu mu muscle up',strictmuscleup:'rmu mu muscle up',running:'run carrera correr',shuttle:'shuttle run carrera ida vuelta',cleanjerk:'c&j cj clean jerk dos tiempos',wallballs:'wb wall balls',burpeebox:'bbjo burpee box jump over',hrpushup:'hrpu push up flexion',dbcarry:'farmers carry db',kbcarry:'farmers carry kb',row:'remo rowerg',bike:'assault echo airbike',ski:'ski ski erg',airsquat:'sentadilla squat',frontsquat:'sentadilla frontal',backsquat:'sentadilla trasera',deadlift:'peso muerto',ringdips:'fondos anillas',ropeclimb:'trepa cuerda'};
+const normalizeSearch=value=>String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+export function searchMovements(catalog,query){
+ const q=normalizeSearch(query);if(!q)return [...catalog].sort((a,b)=>a.name.localeCompare(b.name,'es'));
+ const words=q.split(' ');return catalog.map(m=>{const name=normalizeSearch(m.name),alias=normalizeSearch(MOVEMENT_ALIASES[m.id]),expanded=normalizeSearch(m.name.replace(/Dumbbell/gi,'DB').replace(/Kettlebell/gi,'KB').replace(/Barbell/gi,'BB'));const hay=[name,alias,expanded,normalizeSearch(m.id),normalizeSearch(m.cue)].join(' ');return {m,rank:name===q?0:alias.split(' ').includes(q)?1:name.startsWith(q)?2:3,match:words.every(w=>hay.includes(w))};}).filter(x=>x.match).sort((a,b)=>a.rank-b.rank||a.m.name.localeCompare(b.m.name,'es')).map(x=>x.m);
+}
+export function suggestSubstitutions(m,catalog,units,mode){
+ if(!m)return [];const time=estimateStationSeconds110(m,Number(units)||8,(Number(units)||8)*(m.unit==='climbs'?15:3));
+ const sourcePatterns=new Set(m.patterns);
+ return catalog.filter(x=>x.id!==m.id).map(x=>{const overlap=x.patterns.filter(p=>sourcePatterns.has(p)).length,union=new Set([...m.patterns,...x.patterns]).size;const similarity=overlap/union;const sameDomain=stimulusDomain(m)===stimulusDomain(x);const score=similarity*5+(sameDomain?2:0)+(x.unit===m.unit?1:0)-Math.abs(x.tier-m.tier)*.5;return {movement:x,similarity,score,sameDomain};}).filter(x=>x.similarity>=.34&&x.sameDomain).sort((a,b)=>b.score-a.score||a.movement.name.localeCompare(b.movement.name)).slice(0,5).map(x=>{const m=x.movement,per=estimateStationSeconds110(m,100,m.unit==='climbs'?1500:300)/100||3;let dose=mode==='tabata'?20:Math.max(1,Math.round(time/per));if(m.unit==='meters')dose=Math.max(5,Math.round(dose/5)*5);if(m.unit==='sec')dose=Math.max(5,Math.round(dose/5)*5);dose=Math.min(dose,m.unit==='meters'?50000:m.unit==='sec'?3600:1000);return {...x,units:dose};});
 }

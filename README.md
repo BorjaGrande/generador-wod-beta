@@ -1,3 +1,28 @@
+# Generador WOD · 1.0.18 Beta — Editor compacto y biblioteca
+
+Actualización incremental sobre la 1.0.17 Beta validada. Se mantiene la clave de almacenamiento `generador-wod-beta-v1`, el protocolo del Contador y los filtros de material, nivel, habilidades y formato.
+
+## Novedades
+
+- Editor con movimientos plegados por defecto; pulsa una fila para editar sus atributos, buscar, duplicar o eliminar. Flechas de orden siempre visibles. Añadir abre una fila editable con búsqueda.
+- Búsqueda local por nombres, variantes, abreviaturas (HSPU, HSW, T2B, DU, C2B, DB/KB) y algunos sinónimos. La biblioteca ofrece filtros de material y habilidad.
+- 138 fichas (antes 122); 119 elegibles para generación según requisitos (antes 106). Nuevas fichas: Shuttle Run, Hand-release Push-up, Burpee Pull-up, Box Jump-over, Box Step-over, KB Goblet Squat, KB Deadlift, KB Farmers Carry, DB Suitcase Carry, DB Box Step-up, DB Row, Sandbag Carry y Reverse Lunge. Snatch Pull, Snatch High Pull y Clean Pull son referencias técnicas, no candidatos automáticos. Las fichas añadidas son resúmenes editoriales, no una verificación individual de vídeo oficial.
+- Alternativas de sustitución orientativas: patrón, modalidad de estímulo, dificultad y tiempo estimado. Al seleccionar se recalcula la cantidad aproximada y se limpian peso/altura para evitar arrastrar prescripciones incompatibles. Las alternativas no garantizan estímulo equivalente ni compatibilidad con la fatiga; al aplicar se mantienen las validaciones y avisos del motor. No se ha modificado la ponderación general del algoritmo ni se han aumentado artificialmente las frecuencias de habilidades avanzadas.
+- Márgenes del diálogo mediante áreas seguras iOS; validación visual en dispositivo pendiente.
+
+## Instalación
+
+1. Exportar copia JSON privada desde Registro.
+2. Descomprimir y reemplazar los 11 archivos de la raíz del repositorio beta del Generador; no cambiar el repositorio del Contador ni subir la copia privada.
+3. Abrir con conexión, cerrar y volver a abrir hasta que se muestre v1.0.18 BETA. No borrar datos.
+4. Generar AMRAP, abrir editor y comprobar filas plegadas. Buscar DU, HSPU o HSW (habilitar material, nivel y habilidades pertinentes). Probar sustitución, cantidad, orden, duplicado, eliminación, cancelar/aplicar y enlace al Contador. Revisar filtros de biblioteca y modo sin conexión.
+
+## Validación y límites
+
+Comprobación de sintaxis JS, 80 generaciones y ediciones en modo libre (20 por formato), búsquedas, requisitos, alternativas y enlace al cronómetro desde el motor. El entorno bloqueó la navegación de Chromium, por lo que no se ha verificado el flujo visual en un navegador real, Safari ni la PWA instalada. Los kilos y alturas siguen sin cuantificarse en el modelo. El aumento del catálogo modifica el conjunto de candidatos, no demuestra un aumento de frecuencia de cada movimiento. No publicado en GitHub.
+
+---
+
 # Generador WOD · 1.0.17 Beta — Editor de WODs
 
 Actualización incremental sobre el ZIP 1.0.16 Beta suministrado. No modifica el repositorio del Contador WOD, ni el algoritmo de selección automática, ni la clave de almacenamiento local `generador-wod-beta-v1`.

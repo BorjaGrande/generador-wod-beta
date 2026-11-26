@@ -1500,6 +1500,201 @@ const RAW_CATALOG =
  ]
 ];
 
+RAW_CATALOG.push(...[
+ [
+  "shuttle",
+  "Shuttle Run",
+  "run",
+  "",
+  "cardio|legs",
+  1,
+  "meters",
+  "Marca una distancia fija y gira de forma controlada. La distancia indicada es total.",
+  true,
+  "wod"
+ ],
+ [
+  "hrpushup",
+  "Hand-release Push-up",
+  "",
+  "",
+  "push|core",
+  2,
+  "reps",
+  "Apoya el pecho y despega brevemente las manos antes de volver a empujar.",
+  true,
+  "wod"
+ ],
+ [
+  "burpeepullup",
+  "Burpee Pull-up",
+  "rig",
+  "pullup",
+  "cardio|push|pull|grip|legs",
+  3,
+  "reps",
+  "Completa un burpee y una dominada controlada; utiliza una barra accesible.",
+  true,
+  "wod"
+ ],
+ [
+  "boxjumpover",
+  "Box Jump-over",
+  "box",
+  "",
+  "squat|legs|cardio",
+  2,
+  "reps",
+  "Salta al cajón y baja de forma controlada por el otro lado.",
+  true,
+  "wod"
+ ],
+ [
+  "boxstepover",
+  "Box Step-over",
+  "box",
+  "",
+  "squat|legs",
+  1,
+  "reps",
+  "Sube y cruza el cajón sin salto, alternando la pierna de inicio.",
+  true,
+  "wod"
+ ],
+ [
+  "kbgoblet",
+  "Kettlebell Goblet Squat",
+  "kb",
+  "",
+  "squat|core",
+  1,
+  "reps",
+  "Sujeta la kettlebell delante del pecho y mantén el tronco estable.",
+  true,
+  "wod"
+ ],
+ [
+  "kbdeadlift",
+  "Kettlebell Deadlift",
+  "kb",
+  "",
+  "hinge|grip",
+  1,
+  "reps",
+  "Desplaza la cadera atrás y extiende con espalda estable.",
+  true,
+  "wod"
+ ],
+ [
+  "kbcarry",
+  "Kettlebell Farmers Carry",
+  "kb|carry",
+  "",
+  "grip|core",
+  1,
+  "meters",
+  "Camina con carga a ambos lados y postura erguida.",
+  true,
+  "wod"
+ ],
+ [
+  "dbsuitcase",
+  "Dumbbell Suitcase Carry",
+  "db|carry",
+  "",
+  "grip|core",
+  2,
+  "meters",
+  "Camina con carga a un lado; reparte la distancia entre ambos lados.",
+  true,
+  "wod"
+ ],
+ [
+  "dblateralstep",
+  "Dumbbell Box Step-up",
+  "db|box",
+  "",
+  "squat|legs|grip",
+  2,
+  "reps",
+  "Sube al cajón con control y alterna las piernas.",
+  true,
+  "wod"
+ ],
+ [
+  "dbrow",
+  "Dumbbell Bent-over Row",
+  "db",
+  "",
+  "pull|grip|core",
+  2,
+  "reps",
+  "Mantén el tronco estable y lleva el codo hacia atrás; reparte las reps si es unilateral.",
+  true,
+  "wod"
+ ],
+ [
+  "sandbagcarry",
+  "Sandbag Bear-hug Carry",
+  "sandbag|carry",
+  "",
+  "core|grip|legs",
+  2,
+  "meters",
+  "Abraza el saco y camina erguido con pasos controlados.",
+  true,
+  "wod"
+ ],
+ [
+  "reverse_lunge",
+  "Reverse Lunge",
+  "",
+  "",
+  "squat|legs",
+  1,
+  "reps",
+  "Da un paso atrás y vuelve a la posición inicial alternando las piernas.",
+  true,
+  "wod"
+ ],
+ [
+  "snatchpull",
+  "Snatch Pull",
+  "barbell|plates",
+  "barbell_snatch",
+  "hinge|pull|grip",
+  3,
+  "reps",
+  "Extiende piernas y cadera manteniendo la barra cerca; no hay recepción.",
+  false,
+  "referencia"
+ ],
+ [
+  "snatchhighpull",
+  "Snatch High Pull",
+  "barbell|plates",
+  "barbell_snatch",
+  "hinge|pull|grip",
+  3,
+  "reps",
+  "Completa la extensión y guía los codos arriba, sin recepción.",
+  false,
+  "referencia"
+ ],
+ [
+  "cleanpull",
+  "Clean Pull",
+  "barbell|plates",
+  "barbell_clean",
+  "hinge|pull|grip",
+  3,
+  "reps",
+  "Extiende cadera y rodillas con la barra próxima al cuerpo.",
+  false,
+  "referencia"
+ ]
+]);
+
 export const OFFICIAL_MOVEMENT_CATALOG=RAW_CATALOG.map(([id,name,equipment,technicalSkills,patterns,tier,unit,cue,auto=true,source='oficial'])=>({
  id,name,req:equipment?equipment.split('|'):[],skillsRequired:technicalSkills?technicalSkills.split('|'):[],
  skill:technicalSkills&&!technicalSkills.includes('|')?technicalSkills:null,

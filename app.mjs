@@ -1,5 +1,5 @@
-import {VERSION,EQUIPMENT_GROUPS,SKILLS,MOVEMENTS,OFFICIAL_MOVEMENT_CATALOG,OFFICIAL_LIBRARY_URL,unavailableRequirements,canGenerateMovement,PATTERN_NAMES,DEFAULT_STATE,sanitizeState,normalizeReadiness,isISODate,daysApart,getStress,generateWod,parsePlanCSV,formatWhatsapp,toCSV,contadorUrlForWod,parseCounterTransfer,editorMovements,editWod} from './core.mjs?v=1.0.17';
-import {analyzeTrainingResults} from './analytics.mjs?v=1.0.17';
+import {VERSION,EQUIPMENT_GROUPS,SKILLS,MOVEMENTS,OFFICIAL_MOVEMENT_CATALOG,OFFICIAL_LIBRARY_URL,unavailableRequirements,canGenerateMovement,PATTERN_NAMES,DEFAULT_STATE,sanitizeState,normalizeReadiness,isISODate,daysApart,getStress,generateWod,parsePlanCSV,formatWhatsapp,toCSV,contadorUrlForWod,parseCounterTransfer,editorMovements,editWod,searchMovements,suggestSubstitutions} from './core.mjs?v=1.0.18';
+import {analyzeTrainingResults} from './analytics.mjs?v=1.0.18';
 const STORAGE_KEY='generador-wod-beta-v1';
 // La etiqueta de versión depende del motor importado, no sólo del HTML.
 document.querySelector('.version').textContent=`v${VERSION.replace('-beta',' BETA')}`;
@@ -113,14 +113,17 @@ function renderCatalog(){
  const target=$('movement-catalog');if(!target)return;
  const filter=String($('catalog-search')?.value||'').toLocaleLowerCase('es').trim();
  const only=$('catalog-filter')?.value||'all';
+ const equipment=$('catalog-equipment').value,skill=$('catalog-skill').value;
  const profile=getProfile();const skills=state.skills;
  const allowedLevel=$('level')?.value||'intermedio';
  const count=OFFICIAL_MOVEMENT_CATALOG.filter(m=>canGenerateMovement(m,profile,skills,allowedLevel)).length;
  $('catalog-count').textContent=`${count} disponibles de ${OFFICIAL_MOVEMENT_CATALOG.length} fichas · nivel ${allowedLevel}`;
- const results=OFFICIAL_MOVEMENT_CATALOG.filter(m=>{
+ const results=searchMovements(OFFICIAL_MOVEMENT_CATALOG,filter).filter(m=>{
   const eligible=canGenerateMovement(m,profile,skills,allowedLevel);
+  if(equipment==='none'&&m.req.length||equipment!=='all'&&equipment!=='none'&&!m.req.includes(equipment))return false;
+  if(skill==='none'&&m.skillsRequired.length||skill!=='all'&&skill!=='none'&&!m.skillsRequired.includes(skill))return false;
   if(only==='ready'&&!eligible||only==='blocked'&&eligible||only==='reference'&&m.auto)return false;
-  return !filter||[m.name,m.cue,m.id].some(x=>String(x).toLocaleLowerCase('es').includes(filter));
+  return true;
  });
  target.replaceChildren();
  if(!results.length){target.append(node('p','No hay movimientos con esos filtros.','hint'));return;}
@@ -139,12 +142,15 @@ function renderCatalog(){
   if(m.tier>({principiante:1,intermedio:2,avanzado:3}[allowedLevel]||2))body.append(node('p',`Nivel necesario: ${m.tier===3?'avanzado':'intermedio'}.`,'hint'));
   if(missing.material.length)body.append(node('p',`Material pendiente: ${missing.material.map(id=>EQUIPMENT_GROUPS.flatMap(g=>g.items).find(e=>e[0]===id)?.[1]||id).join(', ')}`,'hint'));
   if(missing.technique.length)body.append(node('p',`Habilidad sin habilitar: ${missing.technique.map(id=>SKILLS.find(s=>s[0]===id)?.[1]||id).join(', ')}`,'hint'));
+  body.append(node('p',`Material: ${m.req.map(id=>EQUIPMENT_GROUPS.flatMap(g=>g.items).find(e=>e[0]===id)?.[1]||id).join(', ')||'Sin material específico'}. · Skills: ${m.skillsRequired.map(id=>SKILLS.find(s=>s[0]===id)?.[1]||id).join(', ')||'Sin requisito específico'}.`,'hint'));
   if(m.source==='wod')body.append(node('p','Movimiento utilizado en WODs de CrossFit; no forma parte del índice principal de demostraciones.','hint'));
   const a=node('a',m.sourceUrl===OFFICIAL_LIBRARY_URL?'Consultar biblioteca CrossFit':'Ver demostración CrossFit','catalog-official');
   a.href=m.sourceUrl;a.target='_blank';a.rel='noopener noreferrer';body.append(a);wrap.append(body);target.append(wrap);
  }
 }
-for(const id of ['catalog-search','catalog-filter'])$(id)?.addEventListener(id==='catalog-search'?'input':'change',renderCatalog);
+for(const group of EQUIPMENT_GROUPS)for(const [id,label] of group.items)$('catalog-equipment').append(option(id,label));
+for(const [id,label] of SKILLS)$('catalog-skill').append(option(id,label));
+for(const id of ['catalog-search','catalog-filter','catalog-equipment','catalog-skill'])$(id)?.addEventListener(id==='catalog-search'?'input':'change',renderCatalog);
 $('level')?.addEventListener('change',renderCatalog);
 function renderPlan(){const list=$('plan-list');list.replaceChildren();$('plan-count').textContent=`${state.plan.length} sesiones`;if(!state.plan.length){list.append(node('div','No hay programación cargada. Importa un CSV o añade sesiones manualmente.','empty'));return}for(const p of [...state.plan].sort((a,b)=>a.date.localeCompare(b.date))){const e=node('div',null,'entry');const head=node('div',null,'entry-head');head.append(node('b',`${p.date} · ${p.title}`),btn('Eliminar',()=>{if(!confirm('¿Eliminar esta sesión de programación?'))return;state.plan=state.plan.filter(q=>q.id!==p.id);save();renderPlan()},'danger-ghost small'));e.append(head,node('small',`${p.movements||''}\nRPE ${p.rpe||7}${p.notes?' · '+p.notes:''}`));list.append(e)}}
 $('plan-form').addEventListener('submit',ev=>{ev.preventDefault();const f=ev.currentTarget;const d=Object.fromEntries(new FormData(f));if(!isISODate(d.date)||!String(d.title||'').trim()||!String(d.movements||'').trim()){notice('Revisa fecha, nombre y movimientos.','error');return}const p={id:`plan-${Date.now()}`,date:d.date,title:d.title.trim(),movements:d.movements.trim(),rpe:Math.min(10,Math.max(1,Number(d.rpe)||7)),notes:d.notes||''};state.plan.push(p);save();renderPlan();f.reset();f.elements.date.value=now();notice('Sesión oficial registrada.');});
@@ -366,9 +372,9 @@ function openWodEditor(original){
  if(mode==='tabata')field(settings,'Pausa entre bloques (s)',draft.pause,v=>draft.pause=v,{min:0,max:600});
  field(settings,'Nombre opcional',draft.name,v=>draft.name=v,{type:'text',full:true,length:65});
  dialog.append(settings,node('h3',mode==='tabata'?'Bloques · 8×20/10':'Movimientos'));
- const list=node('div',null,'editor-list');dialog.append(list);
+ const list=node('div',null,'editor-list');dialog.append(list);let expanded=null;
  function defaultRow(m){return {id:m.id,units:mode==='tabata'?20:m.unit==='meters'?100:m.unit==='sec'?30:m.unit==='cals'?8:m.unit==='climbs'?1:8,kg:'',height:''};}
- const add=btn('Añadir movimiento',()=>{if(!catalog.length||draft.movements.length>=max)return;draft.movements.push(defaultRow(catalog[0]));renderRows();refresh()},'ghost');dialog.append(add);
+ const add=btn('Añadir movimiento',()=>{if(!catalog.length||draft.movements.length>=max)return;const r=defaultRow(catalog[0]);draft.movements.push(r);expanded=r;renderRows();refresh();list.lastElementChild?.querySelector('input[type=search]')?.focus()},'ghost');dialog.append(add);
  const noteGrid=node('div',null,'form-grid');field(noteGrid,'Notas del entrenamiento',draft.notes,v=>draft.notes=v,{textarea:true,full:true,length:500});dialog.append(noteGrid);
  const preview=node('div',null,'editor-preview');preview.setAttribute('aria-live','polite');dialog.append(preview);
  const apply=btn('Aplicar cambios',()=>{
@@ -392,21 +398,30 @@ function openWodEditor(original){
  }
  function renderRows(){
   list.replaceChildren();draft.movements.forEach((r,i)=>{
-   const row=node('div',null,'editor-movement');const controls=node('div',null,'editor-row-head');controls.append(node('strong',`${mode==='tabata'?'Bloque':'Movimiento'} ${i+1}`));
+   const row=node('div',null,'editor-movement');const controls=node('div',null,'editor-row-head');
+   const m=byId.get(r.id)||original.movements.find(x=>x.id===r.id);
+   const summary=()=>`${mode==='tabata'?'20 s':`${r.units||'—'} ${({reps:'reps',meters:'m',cals:'cal',sec:'s',climbs:'asc.'})[m?.unit]||''}`} · ${m?.name||r.id}${r.kg!==''&&r.kg!=null?` · ${r.kg} kg`:''}${r.height!==''&&r.height!=null?` · ${r.height} cm`:''}`;
+   const toggle=btn(summary(),()=>{expanded=expanded===r?null:r;renderRows()},'editor-toggle');toggle.setAttribute('aria-expanded',String(expanded===r));toggle.setAttribute('aria-label',`Editar movimiento ${i+1}: ${summary()}`);
    const up=btn('↑',()=>{[draft.movements[i-1],draft.movements[i]]=[draft.movements[i],draft.movements[i-1]];renderRows();refresh()},'ghost small');up.disabled=i===0;up.setAttribute('aria-label',`Subir movimiento ${i+1}`);
    const down=btn('↓',()=>{[draft.movements[i],draft.movements[i+1]]=[draft.movements[i+1],draft.movements[i]];renderRows();refresh()},'ghost small');down.disabled=i===draft.movements.length-1;down.setAttribute('aria-label',`Bajar movimiento ${i+1}`);
-   controls.append(up,down);row.append(controls);
-   const grid=node('div',null,'form-grid');const l=node('label','Ejercicio','full');const select=node('select');
-   if(!byId.has(r.id))select.append(option(r.id,`${original.movements.find(m=>m.id===r.id)?.name||r.id} · No disponible`));
-   for(const m of catalog)select.append(option(m.id,m.name));select.value=r.id;
-   select.addEventListener('change',()=>{const m=byId.get(select.value);if(m){draft.movements[i]=defaultRow(m);renderRows();refresh()}});l.append(select);grid.append(l);
-   const m=byId.get(r.id)||original.movements.find(x=>x.id===r.id);
-   if(mode!=='tabata')field(grid,unitLabels[m?.unit]||'Cantidad',r.units,v=>r.units=v,{min:1,max:m?.unit==='meters'?50000:m?.unit==='sec'?3600:1000});
-   if(m?.req?.some(x=>['db','kb','barbell','sandbag','medball','wallball','slamball'].includes(x)))field(grid,'Peso (kg, opcional)',r.kg,v=>r.kg=v,{min:0,max:400,step:'0.5'});
-   if(m?.req?.some(x=>['box','walltarget','wall','ropeclimb','rig','rings'].includes(x)))field(grid,'Altura (cm, opcional)',r.height,v=>r.height=v,{min:0,max:1000,step:'1'});
-   row.append(grid);
-   const tools=node('div',null,'editor-row-tools');const duplicate=btn('Duplicar',()=>{draft.movements.splice(i+1,0,{...r});renderRows();refresh()},'ghost small');duplicate.disabled=draft.movements.length>=max;
-   const remove=btn('Eliminar',()=>{draft.movements.splice(i,1);renderRows();refresh()},'danger-ghost small');remove.disabled=draft.movements.length<=1;tools.append(duplicate,remove);row.append(tools);list.append(row);
+   controls.append(toggle,up,down);row.append(controls);list.append(row);
+   if(expanded!==r)return;
+   row.classList.add('is-expanded');
+   const grid=node('div',null,'form-grid');const searchLabel=node('label','Buscar o sustituir ejercicio','full');const search=node('input');search.type='search';search.placeholder='Ej.: HSPU, DU, snatch, DB';search.autocomplete='off';searchLabel.append(search);grid.append(searchLabel);
+   const choices=node('div',null,'editor-choices full');grid.append(choices);
+   function selectMovement(next,units){const replacement=defaultRow(next);if(units!=null)replacement.units=units;draft.movements[i]=replacement;expanded=replacement;renderRows();refresh();}
+   const matchList=()=>{choices.replaceChildren();const q=search.value.trim();if(!q)return;const matches=searchMovements(catalog,q);choices.append(node('p',`${matches.length} compatibles${matches.length>15?' · primeros 15':''}`,'hint'));for(const x of matches.slice(0,15)){const b=btn(x.name,()=>selectMovement(x),'ghost');b.append(node('small',x.req.map(id=>EQUIPMENT_GROUPS.flatMap(g=>g.items).find(e=>e[0]===id)?.[1]||id).join(' · ')||'Sin material específico'));choices.append(b);}if(!matches.length)choices.append(node('p','Sin coincidencias compatibles. Revisa material, nivel o habilidades.','hint'));};
+   search.addEventListener('input',matchList);search.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();const hits=searchMovements(catalog,search.value);if(search.value.trim()&&hits.length===1)selectMovement(hits[0]);}});
+   const browse=btn('Ver todos los compatibles',()=>{choices.replaceChildren();for(const x of catalog){choices.append(btn(x.name,()=>selectMovement(x),'ghost'));}},'ghost small');grid.append(browse);
+   const suggestions=node('div',null,'editor-suggestions full');grid.append(suggestions);
+   function updateSummary(){toggle.textContent=summary();toggle.setAttribute('aria-label',`Editar movimiento ${i+1}: ${summary()}`);}
+   function renderSuggestions(){suggestions.replaceChildren();const suggestionsList=suggestSubstitutions(m,catalog,r.units,mode);if(!suggestionsList.length)return;suggestions.append(node('strong','Alternativas de estímulo parecido'),node('p','Orientativas por patrón y tiempo. No garantizan equivalencia ni RPE; revisa las cargas y avisos.','hint'));for(const x of suggestionsList){const u=({reps:'reps',meters:'m',cals:'cal',sec:'s',climbs:'asc.'})[x.movement.unit];suggestions.append(btn(`${x.movement.name} · ${mode==='tabata'?'20 s':`${x.units} ${u}`}`,()=>selectMovement(x.movement,x.units),'ghost'));}}
+   if(mode!=='tabata')field(grid,unitLabels[m?.unit]||'Cantidad',r.units,v=>{r.units=v;updateSummary();renderSuggestions()},{min:1,max:m?.unit==='meters'?50000:m?.unit==='sec'?3600:1000});
+   if(m?.req?.some(x=>['db','kb','barbell','sandbag','medball','wallball','slamball'].includes(x)))field(grid,'Peso (kg, opcional)',r.kg,v=>{r.kg=v;updateSummary()},{min:0,max:400,step:'0.5'});
+   if(m?.req?.some(x=>['box','walltarget','wall','ropeclimb','rig','rings'].includes(x)))field(grid,'Altura (cm, opcional)',r.height,v=>{r.height=v;updateSummary()},{min:0,max:1000,step:'1'});
+   row.append(grid);renderSuggestions();
+   const tools=node('div',null,'editor-row-tools');const duplicate=btn('Duplicar',()=>{const copy={...r};draft.movements.splice(i+1,0,copy);expanded=copy;renderRows();refresh()},'ghost small');duplicate.disabled=draft.movements.length>=max;
+   const remove=btn('Eliminar',()=>{draft.movements.splice(i,1);expanded=null;renderRows();refresh()},'danger-ghost small');remove.disabled=draft.movements.length<=1;tools.append(duplicate,remove);row.append(tools);
   });add.disabled=draft.movements.length>=max||!catalog.length;
  }
  dialog.addEventListener('close',()=>dialog.remove());document.body.append(dialog);renderRows();refresh();dialog.showModal();
