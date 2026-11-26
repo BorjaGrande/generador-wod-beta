@@ -1,7 +1,7 @@
-import {OFFICIAL_MOVEMENT_CATALOG,OFFICIAL_LIBRARY_URL} from './catalog.mjs?v=1.0.20';
+import {OFFICIAL_MOVEMENT_CATALOG,OFFICIAL_LIBRARY_URL} from './catalog.mjs?v=1.0.21';
 export {OFFICIAL_MOVEMENT_CATALOG,OFFICIAL_LIBRARY_URL};
 // Generador WOD beta — motor local, independiente de la interfaz y sin servicios externos.
-export const VERSION = '1.0.20-beta';
+export const VERSION = '1.0.21-beta';
 export const EQUIPMENT_GROUPS = [
  {title:'Máquinas',items:[['airbike','Assault / Echo Bike'],['bikeerg','BikeErg'],['skierg','SkiErg'],['rowerg','RowErg / remo'],['treadmill','Cinta de correr']]},
  {title:'Pesos y cargas',items:[['db','Mancuernas (DB)'],['kb','Kettlebells (KB)'],['barbell','Barra olímpica'],['plates','Discos bumper'],['rack','Rack para sentadillas'],['sandbag','Sandbag'],['wallball','Wall Ball'],['walltarget','Objetivo / diana para Wall Ball'],['slamball','Slam Ball'],['medball','Balón medicinal']]},
@@ -874,7 +874,12 @@ export function contadorUrlForWod(w) {
  url.hash='gw='+encodeURIComponent(JSON.stringify(snapshot));
  const positiveInt = (value,min,max,label) => { const n=Number(value); if(!Number.isInteger(n)||n<min||n>max)throw new Error(`No puedo configurar el contador: ${label} no válido.`); return n; };
  if (w.mode === 'amrap') q.set('minutes', String(positiveInt(w.duration,1,180,'duración')));
- else if (w.mode === 'fortime') q.set('cap',String(positiveInt(w.cap ?? w.duration,0,60,'tiempo máximo')));
+ else if (w.mode === 'fortime') {
+  q.set('cap',String(positiveInt(w.cap ?? w.duration,0,60,'tiempo máximo')));
+  const rounds=positiveInt(w.rounds,1,100,'rondas FOR TIME');
+  q.set('rounds',String(rounds));snapshot.rounds=rounds;
+  url.hash='gw='+encodeURIComponent(JSON.stringify(snapshot));
+ }
  else if (w.mode === 'emom') {
   const seconds=positiveInt(w.interval||60,10,600,'duración de intervalo');
   const totalMinutes=positiveInt(w.duration,1,120,'duración EMOM');
@@ -907,7 +912,7 @@ export function parseCounterTransfer(hash) {
  if(!d||d.version!==1||d.from!=='contador-wod'||!['amrap','fortime','emom','tabata'].includes(d.mode)||
     !/^[a-zA-Z0-9-]{6,110}$/.test(d.runId||'')||!Number.isSafeInteger(d.finishedAt)||d.finishedAt<=0||
     !Number.isSafeInteger(d.elapsedMs)||d.elapsedMs<0||d.elapsedMs>12*3600*1000||
-    !['manual','limit'].includes(d.finishReason)||!Number.isInteger(d.splitsCount)||d.splitsCount<0||d.splitsCount>10000||
+    !['manual','limit','goal'].includes(d.finishReason)||!Number.isInteger(d.splitsCount)||d.splitsCount<0||d.splitsCount>10000||
     !Number.isInteger(d.extraReps)||d.extraReps<0||d.extraReps>999||
     !Number.isInteger(d.doneIntervals)||d.doneIntervals<0||d.doneIntervals>120||
     (d.splitTimesMs!==undefined&&(!Array.isArray(d.splitTimesMs)||d.splitTimesMs.length>120||!d.splitTimesMs.every(x=>Number.isSafeInteger(x)&&x>=0&&x<=12*3600*1000)))||
@@ -917,6 +922,7 @@ export function parseCounterTransfer(hash) {
     !Array.isArray(d.wod.movements)||d.wod.movements.length<1||d.wod.movements.length>8||
     !d.wod.movements.every(m=>m&&typeof m.name==='string'&&m.name.length<=100&&typeof m.amount==='string'&&m.amount.length<=100))
   throw new Error('Enlace de resultado incompleto o incompatible.');
+ if(d.finishReason==='goal'&&(d.mode!=='fortime'||!Number.isInteger(d.wod.rounds)||d.wod.rounds<1||d.wod.rounds>100||d.splitsCount!==d.wod.rounds))throw new Error('El objetivo de rondas del resultado no coincide con el WOD.');
  const summary=String(d.result||'').slice(0,180);
  if(!summary)throw new Error('El Contador no envió un resultado interpretable.');
  return {...d,result:summary};

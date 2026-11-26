@@ -2,7 +2,7 @@
  * Análisis descriptivo de entrenamientos realizados. No modifica resultados ni
  * parámetros del generador. Separación deliberada entre estimación y medición.
  * Sólo compara FOR TIME cuando se han marcado al menos las rondas previstas,
- * el contador se ha detenido manualmente y existe estimación previa guardada.
+ * el contador se ha detenido por objetivo o manualmente y existe estimación previa guardada.
  */
 export const ANALYTICS_MIN_SAMPLES = 5;
 export const MODES = Object.freeze([
@@ -72,11 +72,11 @@ export function analyzeTrainingResults(state){
     // esto es un indicador de registro, no validación fisiológica.
     const estimate=wod?.stimulusReport?.expectedMinutes;
     const expectedRounds=Number(wod?.rounds);
-    if(counterLinked&&mode==='fortime'&&log.counterFinishReason==='manual'&&
+    if(counterLinked&&mode==='fortime'&&['manual','goal'].includes(log.counterFinishReason)&&
        Number.isFinite(estimate)&&estimate>=1&&estimate<=180&&
        Number.isSafeInteger(log.counterElapsedMs)&&log.counterElapsedMs>=30_000&&
        Number.isFinite(expectedRounds)&&expectedRounds>=1&&
-       Number.isFinite(Number(log.counterRounds))&&Number(log.counterRounds)>=expectedRounds){
+       Number.isFinite(Number(log.counterRounds))&&Number(log.counterRounds)===expectedRounds){
       const actual=log.counterElapsedMs/60_000;
       comparisons.push({wodId:log.wodId,date:log.date||'',title:log.title||wod?.title||'FOR TIME',
         predictedMinutes:estimate,observedMinutes:Math.round(actual*10)/10,

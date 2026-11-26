@@ -1,5 +1,5 @@
-import {VERSION,EQUIPMENT_GROUPS,SKILLS,MOVEMENTS,OFFICIAL_MOVEMENT_CATALOG,OFFICIAL_LIBRARY_URL,unavailableRequirements,canGenerateMovement,PATTERN_NAMES,DEFAULT_STATE,sanitizeState,normalizeReadiness,isISODate,daysApart,getStress,generateWod,parsePlanCSV,formatWhatsapp,toCSV,contadorUrlForWod,parseCounterTransfer,editorMovements,editorMovementBlockers,editWod,searchMovements,suggestSubstitutions} from './core.mjs?v=1.0.20';
-import {analyzeTrainingResults} from './analytics.mjs?v=1.0.20';
+import {VERSION,EQUIPMENT_GROUPS,SKILLS,MOVEMENTS,OFFICIAL_MOVEMENT_CATALOG,OFFICIAL_LIBRARY_URL,unavailableRequirements,canGenerateMovement,PATTERN_NAMES,DEFAULT_STATE,sanitizeState,normalizeReadiness,isISODate,daysApart,getStress,generateWod,parsePlanCSV,formatWhatsapp,toCSV,contadorUrlForWod,parseCounterTransfer,editorMovements,editorMovementBlockers,editWod,searchMovements,suggestSubstitutions} from './core.mjs?v=1.0.21';
+import {analyzeTrainingResults} from './analytics.mjs?v=1.0.21';
 const STORAGE_KEY='generador-wod-beta-v1';
 // La etiqueta de versión depende del motor importado, no sólo del HTML.
 document.querySelector('.version').textContent=`v${VERSION.replace('-beta',' BETA')}`;
@@ -253,12 +253,12 @@ function importCounterResultFromHash(){
   level:meta.level||'intermedio',objective:meta.objective||'mixto',profileName:meta.profileName||'',
   movements:meta.movements.map(m=>({id:m.id||'',name:m.name,amount:m.amount})),
   patterns:Array.isArray(meta.patterns)?meta.patterns.filter(x=>typeof x==='string').slice(0,12):[],
-  readiness:meta.readiness||null,effort:meta.effort||'',createdAt:new Date(transfer.finishedAt).toISOString(),
+  readiness:meta.readiness||null,effort:meta.effort||'',...(meta.mode==='fortime'&&Number.isInteger(meta.rounds)&&meta.rounds>=1&&meta.rounds<=100?{rounds:meta.rounds}:{}),createdAt:new Date(transfer.finishedAt).toISOString(),
   notes:'WOD restaurado desde el enlace del Contador. No sustituye la programación oficial.'};
  const saved=getLogWod(meta.id);
  pendingCounterResult={transfer,fallbackWod:saved||fallbackWod};
  renderLogWodOptions();
- const f=$('log-form');f.elements.wod.value=meta.id;
+ const f=$('log-form');f.reset();f.elements.wod.value=meta.id;
  const done=new Date(transfer.finishedAt);
  f.elements.date.value=[done.getFullYear(),String(done.getMonth()+1).padStart(2,'0'),String(done.getDate()).padStart(2,'0')].join('-');
  f.elements.result.value=transfer.result;
@@ -269,7 +269,13 @@ function importCounterResultFromHash(){
  notice('Resultado recibido del Contador. Comprueba el WOD y completa el RPE real.');
  banner.scrollIntoView({behavior:'auto',block:'start'});
 }
-$('dismiss-counter-import').addEventListener('click',()=>{forgetImportedResult();renderLogWodOptions();notice('Importación descartada. El resultado original sigue en el Contador.','warn');});
+$('dismiss-counter-import').addEventListener('click',()=>{
+ const f=$('log-form');
+ forgetImportedResult();renderLogWodOptions();
+ f.reset();f.elements.date.value=now();f.elements.result.value='';f.elements.rpe.value='';
+ $('counter-import-text').textContent='';
+ notice('Importación descartada. El resultado original sigue en el Contador.','warn');
+});
 $('log-form').addEventListener('submit',ev=>{ev.preventDefault();const f=ev.currentTarget;const d=Object.fromEntries(new FormData(f));const w=getLogWod(d.wod);if(!w){notice('Genera un WOD antes de registrar su resultado.','error');return}if(!isISODate(d.date)||!d.result?.trim()){notice('Introducir fecha y resultado válido.','error');return}
  if(!Number.isInteger(Number(d.rpe))||Number(d.rpe)<1||Number(d.rpe)>10){notice('Introduce tu RPE real (entre 1 y 10).','error');return}
  if(pendingCounterResult&&pendingCounterResult.transfer.wod.id!==w.id){notice('El resultado del Contador corresponde a otro WOD. Descarta la transferencia antes de registrar uno distinto.','error');return}

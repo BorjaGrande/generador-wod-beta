@@ -1,3 +1,13 @@
+# Generador WOD · 1.0.21 Beta — Objetivo FOR TIME y descarte limpio
+
+Actualización sobre 1.0.20 Beta. Envía el número de rondas del FOR TIME al Contador 2.2.5 Beta, tanto en parámetros como en la ficha del WOD. Acepta la nueva causa de finalización por objetivo; conserva compatibilidad con resultados antiguos. La comparación FOR TIME exige exactamente las rondas previstas, un tiempo medido válido y una estimación previa; no incluye CAP ni resultados con exceso de marcas. Al descartar una importación se limpia el formulario de resultado, RPE, pesos, observaciones y selecciones de valoración, sin eliminar registros guardados ni el WOD. También se reinicia la valoración al recibir una importación nueva para no arrastrar valores anteriores. La selección del WOD puede seguir visible para registrar otra ejecución manual. Se mantiene el algoritmo de generación, catálogo, editor y clave de almacenamiento.
+
+Instalación: exportar copia JSON privada; actualizar primero `contador-wod-beta` a 2.2.5 Beta; reemplazar los 11 archivos de la raíz de `generador-wod-beta` con este ZIP. Abrir con conexión hasta comprobar v1.0.21 BETA. No publicar en los repositorios estables ni borrar los datos locales.
+
+Validación: sintaxis y pruebas automatizadas Node.js de enlace, recepción de objetivo, comparación de resultados y controlador de descarte con DOM simulado. La navegación local de Chromium está bloqueada por el entorno; pendiente validación en iPhone y guardado definitivo de prueba. No publicado en GitHub.
+
+---
+
 # Generador WOD · 1.0.20 Beta — Enlace al Contador Beta
 
 Corrección puntual sobre 1.0.19 Beta: «Abrir contador WOD» apunta a `https://borjagrande.github.io/contador-wod-beta/`. Se conservan los parámetros del cronómetro, la ficha del WOD en el fragmento y el protocolo de resultados. El ZIP del Contador 2.2.4 Beta ya devuelve los resultados a `https://borjagrande.github.io/generador-wod-beta/`; no requiere modificaciones. Se actualizan las versiones de recursos y de caché del Generador, sin borrar el almacenamiento local ni cambiar el algoritmo, el editor o el catálogo.
