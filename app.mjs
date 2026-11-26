@@ -1,5 +1,5 @@
-import {VERSION,EQUIPMENT_GROUPS,SKILLS,MOVEMENTS,OFFICIAL_MOVEMENT_CATALOG,OFFICIAL_LIBRARY_URL,unavailableRequirements,canGenerateMovement,PATTERN_NAMES,DEFAULT_STATE,sanitizeState,normalizeReadiness,isISODate,daysApart,getStress,generateWod,parsePlanCSV,formatWhatsapp,toCSV,contadorUrlForWod,parseCounterTransfer,editorMovements,editWod,searchMovements,suggestSubstitutions} from './core.mjs?v=1.0.18';
-import {analyzeTrainingResults} from './analytics.mjs?v=1.0.18';
+import {VERSION,EQUIPMENT_GROUPS,SKILLS,MOVEMENTS,OFFICIAL_MOVEMENT_CATALOG,OFFICIAL_LIBRARY_URL,unavailableRequirements,canGenerateMovement,PATTERN_NAMES,DEFAULT_STATE,sanitizeState,normalizeReadiness,isISODate,daysApart,getStress,generateWod,parsePlanCSV,formatWhatsapp,toCSV,contadorUrlForWod,parseCounterTransfer,editorMovements,editorMovementBlockers,editWod,searchMovements,suggestSubstitutions} from './core.mjs?v=1.0.19';
+import {analyzeTrainingResults} from './analytics.mjs?v=1.0.19';
 const STORAGE_KEY='generador-wod-beta-v1';
 // La etiqueta de versión depende del motor importado, no sólo del HTML.
 document.querySelector('.version').textContent=`v${VERSION.replace('-beta',' BETA')}`;
@@ -410,7 +410,14 @@ function openWodEditor(original){
    const grid=node('div',null,'form-grid');const searchLabel=node('label','Buscar o sustituir ejercicio','full');const search=node('input');search.type='search';search.placeholder='Ej.: HSPU, DU, snatch, DB';search.autocomplete='off';searchLabel.append(search);grid.append(searchLabel);
    const choices=node('div',null,'editor-choices full');grid.append(choices);
    function selectMovement(next,units){const replacement=defaultRow(next);if(units!=null)replacement.units=units;draft.movements[i]=replacement;expanded=replacement;renderRows();refresh();}
-   const matchList=()=>{choices.replaceChildren();const q=search.value.trim();if(!q)return;const matches=searchMovements(catalog,q);choices.append(node('p',`${matches.length} compatibles${matches.length>15?' · primeros 15':''}`,'hint'));for(const x of matches.slice(0,15)){const b=btn(x.name,()=>selectMovement(x),'ghost');b.append(node('small',x.req.map(id=>EQUIPMENT_GROUPS.flatMap(g=>g.items).find(e=>e[0]===id)?.[1]||id).join(' · ')||'Sin material específico'));choices.append(b);}if(!matches.length)choices.append(node('p','Sin coincidencias compatibles. Revisa material, nivel o habilidades.','hint'));};
+   const matchList=()=>{
+    choices.replaceChildren();choices.scrollTop=0;const q=search.value.trim();if(!q)return;
+    const all=searchMovements(OFFICIAL_MOVEMENT_CATALOG,q),matches=all.filter(x=>byId.has(x.id)),blocked=all.filter(x=>!byId.has(x.id));
+    choices.append(node('p',`${matches.length} compatibles · ${blocked.length} no disponibles${matches.length>15||blocked.length>15?' · hasta 15 por grupo':''}`,'hint'));
+    for(const x of matches.slice(0,15)){const b=btn(x.name,()=>selectMovement(x),'ghost');b.append(node('small',x.req.map(id=>EQUIPMENT_GROUPS.flatMap(g=>g.items).find(e=>e[0]===id)?.[1]||id).join(' · ')||'Sin material específico'));choices.append(b);}
+    if(blocked.length){choices.append(node('p','No disponibles con tu configuración actual','hint editor-blocked-heading'));for(const x of blocked.slice(0,15)){const item=node('div',null,'editor-blocked');item.append(node('strong',x.name));for(const reason of editorMovementBlockers(x,state,original,profile))item.append(node('small',reason));choices.append(item);}}
+    if(!all.length)choices.append(node('p','No hay coincidencias en la biblioteca. Prueba otro nombre o abreviatura.','hint'));
+   };
    search.addEventListener('input',matchList);search.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();const hits=searchMovements(catalog,search.value);if(search.value.trim()&&hits.length===1)selectMovement(hits[0]);}});
    const browse=btn('Ver todos los compatibles',()=>{choices.replaceChildren();for(const x of catalog){choices.append(btn(x.name,()=>selectMovement(x),'ghost'));}},'ghost small');grid.append(browse);
    const suggestions=node('div',null,'editor-suggestions full');grid.append(suggestions);

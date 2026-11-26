@@ -1,3 +1,11 @@
+# Generador WOD · 1.0.19 Beta — Corrección del buscador
+
+Actualización incremental sobre 1.0.18. Los acrónimos completos DU, SU, HSPU, HSW, T2B, C2B, BMU, RMU, DB y KB tienen significado explícito; DU no devuelve mancuernas. DB y KB buscan por requisito de material. Los resultados incompatibles aparecen como información no seleccionable, con motivos concretos: material, habilidad, nivel, referencia técnica o formato. Se mantiene el algoritmo, el catálogo de 138 fichas, el almacenamiento y el protocolo del Contador. No se rebajan automáticamente requisitos. Los pesos y alturas no se cuantifican en el modelo de carga.
+
+Instalación: exportar copia JSON privada, reemplazar los 11 archivos de la raíz del repositorio del Generador, abrir con conexión y volver a abrir hasta ver v1.0.19 BETA. No modificar el Contador. Validar DU/HSPU/SkiErg con requisitos activos e inactivos, DB/KB, sustitución y enlace EMOM. No publicado ni probado visualmente en iPhone.
+
+---
+
 # Generador WOD · 1.0.18 Beta — Editor compacto y biblioteca
 
 Actualización incremental sobre la 1.0.17 Beta validada. Se mantiene la clave de almacenamiento `generador-wod-beta-v1`, el protocolo del Contador y los filtros de material, nivel, habilidades y formato.

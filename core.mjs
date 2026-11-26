@@ -1,7 +1,7 @@
-import {OFFICIAL_MOVEMENT_CATALOG,OFFICIAL_LIBRARY_URL} from './catalog.mjs?v=1.0.18';
+import {OFFICIAL_MOVEMENT_CATALOG,OFFICIAL_LIBRARY_URL} from './catalog.mjs?v=1.0.19';
 export {OFFICIAL_MOVEMENT_CATALOG,OFFICIAL_LIBRARY_URL};
 // Generador WOD beta — motor local, independiente de la interfaz y sin servicios externos.
-export const VERSION = '1.0.18-beta';
+export const VERSION = '1.0.19-beta';
 export const EQUIPMENT_GROUPS = [
  {title:'Máquinas',items:[['airbike','Assault / Echo Bike'],['bikeerg','BikeErg'],['skierg','SkiErg'],['rowerg','RowErg / remo'],['treadmill','Cinta de correr']]},
  {title:'Pesos y cargas',items:[['db','Mancuernas (DB)'],['kb','Kettlebells (KB)'],['barbell','Barra olímpica'],['plates','Discos bumper'],['rack','Rack para sentadillas'],['sandbag','Sandbag'],['wallball','Wall Ball'],['walltarget','Objetivo / diana para Wall Ball'],['slamball','Slam Ball'],['medball','Balón medicinal']]},
@@ -922,12 +922,21 @@ export function parseCounterTransfer(hash) {
  return {...d,result:summary};
 }
 
-// 1.0.18: ediciones explícitas, independientes de la selección automática.
+// 1.0.19: ediciones explícitas, independientes de la selección automática.
 // Se estiman los nuevos volúmenes sin reutilizar la puntuación del WOD original.
 const EDIT_UNITS={reps:'reps',meters:'m',cals:'cal',sec:'s',climbs:'ascensos'};
+export function editorMovementBlockers(m,state,w,profile){
+ const {material,technique}=unavailableRequirements(m,profile,state.skills||[]);
+ const reasons=[];
+ if(material.length)reasons.push('Material no disponible: '+material.map(id=>EQUIPMENT[id]||id).join(', '));
+ if(technique.length)reasons.push('Habilidad sin habilitar: '+technique.map(id=>SKILLS.find(s=>s[0]===id)?.[1]||id).join(', '));
+ if(m.tier>({principiante:1,intermedio:2,avanzado:3}[w.level]||2))reasons.push('Nivel requerido: '+(m.tier===3?'avanzado':'intermedio'));
+ if(!m.auto)reasons.push('Referencia técnica: no disponible en el editor de WODs');
+ else if(w.mode==='tabata'&&!(w.strategy==='inteligente'?EXTRA_TABATA:TABATA_SAFE).has(m.id))reasons.push('No permitido en este formato TABATA');
+ return reasons;
+}
 export function editorMovements(state,w,profile){
- return MOVEMENTS.filter(m=>canGenerateMovement(m,profile,state.skills,w.level)&&
-   (w.mode!=='tabata'||(w.strategy==='inteligente'?EXTRA_TABATA:TABATA_SAFE).has(m.id)));
+ return MOVEMENTS.filter(m=>editorMovementBlockers(m,state,w,profile).length===0);
 }
 export function editWod(original,draft,state,profile){
  if(!original||original.kind==='recovery'||!['amrap','fortime','emom','tabata'].includes(original.mode))throw new Error('No hay un WOD editable.');
@@ -1004,11 +1013,16 @@ export function editWod(original,draft,state,profile){
  return {wod:edited,warnings,costs,budgets:smart?budgets:null,expectedMinutes};
 }
 
-// 1.0.18: búsquedas y alternativas heurísticas, sin cambiar automáticamente el WOD.
+// 1.0.19: búsquedas y alternativas heurísticas, sin cambiar automáticamente el WOD.
 const MOVEMENT_ALIASES={pullups:'pull up dominada dominadas strict pu',kippingpullup:'pull up dominada kpu',butterflypullup:'pull up dominada bpu',c2b:'c2b ct b ctb chest to bar dominada',kippingc2b:'c2b ctb chest to bar dominada',ttb:'t2b ttb toes to bar',kippingttb:'t2b ttb toes to bar',hspu:'hspu handstand push up',stricthspu:'hspu strict',chestwallhspu:'hspu',deficithspu:'hspu',freestandinghspu:'hspu',handstandwalk:'hsw handstand walk caminar manos',wallwalk:'ww wall walk',doubles:'du comba dobles double unders',singles:'su comba simples single unders',bmu:'bmu mu muscle up',strictbmu:'bmu mu muscle up',rmu:'rmu mu muscle up',strictmuscleup:'rmu mu muscle up',running:'run carrera correr',shuttle:'shuttle run carrera ida vuelta',cleanjerk:'c&j cj clean jerk dos tiempos',wallballs:'wb wall balls',burpeebox:'bbjo burpee box jump over',hrpushup:'hrpu push up flexion',dbcarry:'farmers carry db',kbcarry:'farmers carry kb',row:'remo rowerg',bike:'assault echo airbike',ski:'ski ski erg',airsquat:'sentadilla squat',frontsquat:'sentadilla frontal',backsquat:'sentadilla trasera',deadlift:'peso muerto',ringdips:'fondos anillas',ropeclimb:'trepa cuerda'};
 const normalizeSearch=value=>String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+// Los acrónimos deportivos completos nunca caen en la búsqueda por subcadenas.
+const EXACT_SEARCH_IDS={du:['doubles'],su:['singles'],hspu:['hspu','stricthspu','chestwallhspu','deficithspu','freestandinghspu'],hsw:['handstandwalk'],t2b:['ttb','kippingttb'],ttb:['ttb','kippingttb'],c2b:['c2b','kippingc2b'],ctb:['c2b','kippingc2b'],bmu:['bmu','strictbmu'],rmu:['rmu','strictmuscleup'],mu:['bmu','strictbmu','rmu','strictmuscleup'],ww:['wallwalk'],bbjo:['burpeebox'],hrpu:['hrpushup'],wb:['wallballs'],cj:['cleanjerk'],'c j':['cleanjerk'],kpu:['kippingpullup'],bpu:['butterflypullup'],pu:['pullups','kippingpullup','butterflypullup']};
+const EXACT_EQUIPMENT={db:'db',kb:'kb',bb:'barbell'};
 export function searchMovements(catalog,query){
  const q=normalizeSearch(query);if(!q)return [...catalog].sort((a,b)=>a.name.localeCompare(b.name,'es'));
+ if(Object.hasOwn(EXACT_SEARCH_IDS,q)){const ids=EXACT_SEARCH_IDS[q];return catalog.filter(m=>ids.includes(m.id)).sort((a,b)=>ids.indexOf(a.id)-ids.indexOf(b.id));}
+ if(Object.hasOwn(EXACT_EQUIPMENT,q))return catalog.filter(m=>m.req.includes(EXACT_EQUIPMENT[q])).sort((a,b)=>a.name.localeCompare(b.name,'es'));
  const words=q.split(' ');return catalog.map(m=>{const name=normalizeSearch(m.name),alias=normalizeSearch(MOVEMENT_ALIASES[m.id]),expanded=normalizeSearch(m.name.replace(/Dumbbell/gi,'DB').replace(/Kettlebell/gi,'KB').replace(/Barbell/gi,'BB'));const hay=[name,alias,expanded,normalizeSearch(m.id),normalizeSearch(m.cue)].join(' ');return {m,rank:name===q?0:alias.split(' ').includes(q)?1:name.startsWith(q)?2:3,match:words.every(w=>hay.includes(w))};}).filter(x=>x.match).sort((a,b)=>a.rank-b.rank||a.m.name.localeCompare(b.m.name,'es')).map(x=>x.m);
 }
 export function suggestSubstitutions(m,catalog,units,mode){
