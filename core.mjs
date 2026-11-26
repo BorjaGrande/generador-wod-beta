@@ -1,7 +1,7 @@
-import {OFFICIAL_MOVEMENT_CATALOG,OFFICIAL_LIBRARY_URL} from './catalog.mjs?v=1.0.19';
+import {OFFICIAL_MOVEMENT_CATALOG,OFFICIAL_LIBRARY_URL} from './catalog.mjs?v=1.0.20';
 export {OFFICIAL_MOVEMENT_CATALOG,OFFICIAL_LIBRARY_URL};
 // Generador WOD beta — motor local, independiente de la interfaz y sin servicios externos.
-export const VERSION = '1.0.19-beta';
+export const VERSION = '1.0.20-beta';
 export const EQUIPMENT_GROUPS = [
  {title:'Máquinas',items:[['airbike','Assault / Echo Bike'],['bikeerg','BikeErg'],['skierg','SkiErg'],['rowerg','RowErg / remo'],['treadmill','Cinta de correr']]},
  {title:'Pesos y cargas',items:[['db','Mancuernas (DB)'],['kb','Kettlebells (KB)'],['barbell','Barra olímpica'],['plates','Discos bumper'],['rack','Rack para sentadillas'],['sandbag','Sandbag'],['wallball','Wall Ball'],['walltarget','Objetivo / diana para Wall Ball'],['slamball','Slam Ball'],['medball','Balón medicinal']]},
@@ -854,10 +854,10 @@ export function formatWhatsapp(w){
 }
 export function toCSV(rows,headers){const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;return [headers.join(';'),...rows.map(r=>headers.map(h=>q(r[h])).join(';'))].join('\r\n');}
 
-/** URL de preparación de cronómetro. No envía programación, nombres ni resultados. */
+/** URL del Contador Beta: configuración y ficha del WOD en fragmento; sin resultados. */
 export function contadorUrlForWod(w) {
  if (!w || w.kind === 'recovery' || !['amrap','fortime','emom','tabata'].includes(w.mode)) throw new Error('Genera primero un WOD con formato compatible.');
- const url = new URL('https://borjagrande.github.io/contador-wod/');
+ const url = new URL('https://borjagrande.github.io/contador-wod-beta/');
  const q = url.searchParams;
  q.set('from', 'generador-wod');
  q.set('v', '1');

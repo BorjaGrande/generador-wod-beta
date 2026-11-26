@@ -1,3 +1,13 @@
+# Generador WOD · 1.0.20 Beta — Enlace al Contador Beta
+
+Corrección puntual sobre 1.0.19 Beta: «Abrir contador WOD» apunta a `https://borjagrande.github.io/contador-wod-beta/`. Se conservan los parámetros del cronómetro, la ficha del WOD en el fragmento y el protocolo de resultados. El ZIP del Contador 2.2.4 Beta ya devuelve los resultados a `https://borjagrande.github.io/generador-wod-beta/`; no requiere modificaciones. Se actualizan las versiones de recursos y de caché del Generador, sin borrar el almacenamiento local ni cambiar el algoritmo, el editor o el catálogo.
+
+Instalación: exportar copia JSON privada, reemplazar los 11 archivos en la raíz del repositorio `generador-wod-beta`, confirmar commit y abrir con conexión hasta ver v1.0.20 BETA. No publicar en repositorios estables. No actualizar el Contador. No borrar datos de navegación.
+
+Validación: pruebas de sintaxis y de ida y vuelta del protocolo para AMRAP, FOR TIME, EMOM y TABATA por bloques con Node.js, usando las funciones del Contador 2.2.4 Beta. Pendiente de validación visual y de navegación real en iPhone. No publicado en GitHub.
+
+---
+
 # Generador WOD · 1.0.19 Beta — Corrección del buscador
 
 Actualización incremental sobre 1.0.18. Los acrónimos completos DU, SU, HSPU, HSW, T2B, C2B, BMU, RMU, DB y KB tienen significado explícito; DU no devuelve mancuernas. DB y KB buscan por requisito de material. Los resultados incompatibles aparecen como información no seleccionable, con motivos concretos: material, habilidad, nivel, referencia técnica o formato. Se mantiene el algoritmo, el catálogo de 138 fichas, el almacenamiento y el protocolo del Contador. No se rebajan automáticamente requisitos. Los pesos y alturas no se cuantifican en el modelo de carga.
