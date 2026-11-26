@@ -1,7 +1,7 @@
-import {OFFICIAL_MOVEMENT_CATALOG,OFFICIAL_LIBRARY_URL} from './catalog.mjs?v=1.0.21';
+import {OFFICIAL_MOVEMENT_CATALOG,OFFICIAL_LIBRARY_URL} from './catalog.mjs?v=1.0.22';
 export {OFFICIAL_MOVEMENT_CATALOG,OFFICIAL_LIBRARY_URL};
 // Generador WOD beta — motor local, independiente de la interfaz y sin servicios externos.
-export const VERSION = '1.0.21-beta';
+export const VERSION = '1.0.22-beta';
 export const EQUIPMENT_GROUPS = [
  {title:'Máquinas',items:[['airbike','Assault / Echo Bike'],['bikeerg','BikeErg'],['skierg','SkiErg'],['rowerg','RowErg / remo'],['treadmill','Cinta de correr']]},
  {title:'Pesos y cargas',items:[['db','Mancuernas (DB)'],['kb','Kettlebells (KB)'],['barbell','Barra olímpica'],['plates','Discos bumper'],['rack','Rack para sentadillas'],['sandbag','Sandbag'],['wallball','Wall Ball'],['walltarget','Objetivo / diana para Wall Ball'],['slamball','Slam Ball'],['medball','Balón medicinal']]},
@@ -674,8 +674,8 @@ function buildOptimizedExtra({state,mode,date,level,objective,duration,requested
   const picked=createCandidateSelection109(pool,mode==='tabata'?template.slice(0,blocks):template,stress,rng,state,date);
   if(!picked)continue;
   const selected=mode==='tabata'?picked.slice(0,blocks):picked;
-  for(const factor of [0.78,0.92,1.06,1.18]){
-   const roundsList=mode==='fortime'?[3,4,5]:[null];
+  for(const factor of (mode==='fortime'&&clipped<4?[0.55,0.72,0.88,1.02,1.18]:[0.78,0.92,1.06,1.18])){
+   const roundsList=mode==='fortime'?(clipped<4?[1,2]:[3,4,5]):[null];
    for(const rounds of roundsList){
     const result=evaluate109(selected,{state,date,stress,assessment,readiness,mode,duration:clipped,level,objective,budgets,effort,multiplier:factor,rounds});
     if(result)candidates.push(result);
@@ -729,7 +729,8 @@ export function generateWod({state,mode='random',strategy='libre',duration=15,le
  if(!['libre','inteligente'].includes(strategy))throw new Error('Estrategia no válida.');
  if(!['principiante','intermedio','avanzado'].includes(level))throw new Error('Nivel no válido.');
  if(!['mixto','cardio','fuerza-resistencia','gimnasia'].includes(objective))throw new Error('Objetivo no válido.');
- duration=Number(duration);if(!Number.isInteger(duration)||duration<4||duration>60)throw new Error('La duración debe estar entre 4 y 60 minutos.');
+ duration=Number(duration);const minDuration=mode==='fortime'?1:4;
+ if(!Number.isInteger(duration)||duration<minDuration||duration>60)throw new Error(`La duración debe estar entre ${minDuration} y 60 minutos.`);
  if(strategy==='inteligente'&&!state.plan.length)throw new Error('Para usar WOD extra inteligente, carga primero tu programación oficial de CrossFit.');
  if(strategy==='inteligente'&&!state.plan.some(p=>Math.abs(daysApart(p.date,date))<=2))throw new Error('No hay sesiones oficiales en los dos días anteriores o posteriores a la fecha elegida. Importa esa parte de la programación antes de generar un WOD extra inteligente.');
  const formats=duration>20?['amrap','fortime','emom']:['amrap','fortime','emom','tabata'];
@@ -804,6 +805,7 @@ export function generateWod({state,mode='random',strategy='libre',duration=15,le
  if(mode==='tabata')pool=pool.filter(m=>TABATA_SAFE.has(m.id));
  if(mode==='emom')pool=pool.filter(m=>stationDose(m,level)!==null);
  if(pool.length<(mode==='tabata'?1:2)){if(strategy==='inteligente')return recoveryRecommendation(date,level,objective,stress,{...assessment,reason:'La carga detectada no deja suficientes ejercicios de bajo riesgo para componer un WOD extra.',highPatterns:Object.keys(stress.scores).filter(k=>stress.scores[k]>=1.9)});throw new Error('No hay suficientes ejercicios compatibles con esta modalidad, material y nivel. Prueba otro formato o selecciona más equipamiento.');}
+ if(mode==='fortime'&&duration<4)return buildFreeSprint({pool,state,date,level,objective,duration,profile,stress,rng});
  const layout=mode==='tabata'?tabataLayout(duration):null;
  const target=mode==='tabata'?Math.min(layout.blocks,pool.length):mode==='emom'?Math.min(4,Math.max(2,Math.round(duration/5))):duration<10?3:4;
  const selected=selectBalanced(pool,target,objective,strategy,stress,rng);
@@ -824,6 +826,38 @@ export function generateWod({state,mode='random',strategy='libre',duration=15,le
  ...(layout?{tabata:{blocks:layout.blocks,roundsPerBlock:8,workSeconds:20,restSeconds:10,betweenBlocksSeconds:layout.rest}}:{}),
  title,movements:movementEntries,patterns:[...new Set(selected.flatMap(m=>m.patterns))],notes,advice,profileName:profile.name,createdAt:new Date().toISOString(),intensity:strategy==='inteligente'?(activeStress.length?'RPE 4–5/10 orientativo':'RPE 5–6/10 orientativo'):'RPE 6–7/10 orientativo'};
 }
+// FOR TIME de 1–3 minutos: seleccionar dos movimientos y ajustar el volumen
+// a una estimación plausible; no se convierte el WOD habitual de 4+ min en sprint.
+function buildFreeSprint({pool,state,date,level,objective,duration,profile,stress,rng}){
+ const cap=duration*60,candidates=[];
+ for(let i=0;i<90;i++){
+  const selected=selectBalanced(pool,2,objective,'libre',stress,rng);
+  if(selected.length!==2||new Set(selected.map(stimulusDomain)).size<2)continue;
+  if(objective==='cardio'&&!selected.some(m=>m.patterns.includes('cardio')))continue;
+  if(objective==='gimnasia'&&!selected.some(m=>['traccion','empuje','core'].includes(stimulusDomain(m))))continue;
+  if(objective==='fuerza-resistencia'&&!selected.some(m=>isLoaded(m)||['traccion','empuje','piernas'].includes(stimulusDomain(m))))continue;
+  for(const rounds of [1,2,3])for(const factor of [.5,.7,.9,1,1.2]){
+   const movements=selected.map(m=>{
+    const baseline=parseFloat(makeAmount(m,'fortime',duration,level));
+    let units=Math.max(1,Math.round(baseline*factor));
+    if(m.unit==='meters'||m.unit==='sec')units=Math.max(5,Math.round(units/5)*5);
+    if(m.unit==='climbs')units=Math.max(1,units);
+    const estimateSeconds=Math.max(1,estimateStationSeconds110(m,units,units*(m.unit==='climbs'?15:3)));
+    return {...m,units,estimateSeconds,amount:`${units} ${EDIT_UNITS[m.unit]}`};
+   });
+   if(movements.some(m=>!minimumUsefulDose110(m,m,rounds,'fortime')))continue;
+   const estimate=(movements.reduce((n,m)=>n+m.estimateSeconds,0)+movements.length*6)*rounds;
+   if(estimate<cap*.60||estimate>cap*.95)continue;
+   candidates.push({movements,rounds,estimate,score:Math.abs(estimate/cap-.80)-novelty110(movements,state,date)*.01});
+  }
+ }
+ if(!candidates.length)throw new Error('No hay un FOR TIME corto con volumen y duración plausibles para este perfil. Prueba más tiempo o cambia el material/objetivo.');
+ candidates.sort((a,b)=>a.score-b.score);
+ const {movements,rounds,estimate}=chooseFrom(candidates.slice(0,12),rng);
+ return {id:`wod-${Date.now()}-${Math.floor(rng()*1e7)}`,date,mode:'fortime',strategy:'libre',level,objective,duration,requestedDuration:duration,cap:duration,capSeconds:cap,rounds,interval:0,title:`FOR TIME · CAP ${duration}'`,movements,patterns:[...new Set(movements.flatMap(m=>m.patterns))],notes:'Formato corto: volumen ajustado a una estimación de tiempo. La velocidad y la carga real dependen del atleta; no fuerces la técnica ni aceleres para cumplir el CAP.',advice:`${rounds} ${rounds===1?'ronda':'rondas'} por tiempo. CAP ${formatCapSeconds(cap)}. Tiempo estimado: ${formatCapSeconds(estimate)}.`,profileName:profile.name,createdAt:new Date().toISOString(),intensity:'RPE orientativo 6–7/10',stimulusReport:{expectedMinutes:estimate/60,domains:[...new Set(movements.map(stimulusDomain))],interference:'No evaluada en modo libre',budgetUse:null,advice:'Estimación orientativa.'}};
+}
+export function formatMeasuredTime(ms){const d=Math.floor(Math.max(0,ms)/100);const mins=Math.floor(d/600);const seconds=String(Math.floor(d/10)%60).padStart(2,'0');return `${mins>=60?String(Math.floor(mins/60)).padStart(2,'0')+':'+String(mins%60).padStart(2,'0'):String(mins).padStart(2,'0')}:${seconds}.${d%10}`;}
+export function formatCapSeconds(s){return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;}
 function formatMinutes(value){return Number.isInteger(value)?String(value):String(Number(value.toFixed(1))).replace('.',',');}
 export function readCSV(text){
  const rows=[];const raw=String(text).replace(/^\uFEFF/,'');const first=raw.split(/\r?\n/,1)[0];const sep=first.split(';').length>first.split(',').length?';':',';let cell='',row=[],inQuotes=false;
@@ -875,7 +909,9 @@ export function contadorUrlForWod(w) {
  const positiveInt = (value,min,max,label) => { const n=Number(value); if(!Number.isInteger(n)||n<min||n>max)throw new Error(`No puedo configurar el contador: ${label} no válido.`); return n; };
  if (w.mode === 'amrap') q.set('minutes', String(positiveInt(w.duration,1,180,'duración')));
  else if (w.mode === 'fortime') {
-  q.set('cap',String(positiveInt(w.cap ?? w.duration,0,60,'tiempo máximo')));
+  const capSeconds=positiveInt(w.capSeconds??Number(w.cap??w.duration)*60,0,3600,'tiempo máximo (s)');
+  q.set('capseconds',String(capSeconds));
+  if(capSeconds%60===0)q.set('cap',String(capSeconds/60));
   const rounds=positiveInt(w.rounds,1,100,'rondas FOR TIME');
   q.set('rounds',String(rounds));snapshot.rounds=rounds;
   url.hash='gw='+encodeURIComponent(JSON.stringify(snapshot));
@@ -925,7 +961,7 @@ export function parseCounterTransfer(hash) {
  if(d.finishReason==='goal'&&(d.mode!=='fortime'||!Number.isInteger(d.wod.rounds)||d.wod.rounds<1||d.wod.rounds>100||d.splitsCount!==d.wod.rounds))throw new Error('El objetivo de rondas del resultado no coincide con el WOD.');
  const summary=String(d.result||'').slice(0,180);
  if(!summary)throw new Error('El Contador no envió un resultado interpretable.');
- return {...d,result:summary};
+ return {...d,result:summary.replace(/\b\d{1,3}:\d{2}(?::\d{2})?(?:[.,]\d+)?\b/,formatMeasuredTime(d.elapsedMs))};
 }
 
 // 1.0.19: ediciones explícitas, independientes de la selección automática.
@@ -954,15 +990,18 @@ export function editWod(original,draft,state,profile){
  const readiness=normalizeReadiness(original.readiness||state.readiness),stress=getStress(state.plan,state.logs,original.date),assessment=assessIntelligentDay(stress);
  const {budgets}=getPatternBudgets(state,original.date,stress,readiness,assessment);
  const warnings=[], allowed=new Map(editorMovements(state,original,profile).map(m=>[m.id,m]));
- let duration,rounds=null,interval=0,tabata,cap;
+ let duration,rounds=null,interval=0,tabata,cap,capSeconds;
  if(mode==='tabata'){
   // Mantiene los bloques estándar compatibles con el Contador 2.2.3.
   const pause=rows.length===1?0:integer(draft.pause,0,600,'Pausa entre bloques');
   tabata={blocks:rows.length,roundsPerBlock:8,workSeconds:20,restSeconds:10,betweenBlocksSeconds:pause};
   rounds=rows.length*8;interval=30;duration=(rows.length*240+(rows.length-1)*pause)/60;
  }else{
-  duration=integer(draft.duration,1,mode==='amrap'?180:mode==='fortime'?60:120,mode==='fortime'?'CAP':'Duración');
-  if(mode==='fortime')rounds=integer(draft.rounds,1,100,'Rondas');
+  if(mode==='fortime'){
+   capSeconds=draft.capMinutes!==undefined||draft.capSeconds!==undefined?integer(draft.capMinutes,0,60,'Minutos CAP')*60+integer(draft.capSeconds,0,59,'Segundos CAP'):Number(draft.duration)*60;
+   if(!Number.isInteger(capSeconds)||capSeconds<30||capSeconds>3600)throw new Error('CAP: entre 00:30 y 60:00.');
+   duration=capSeconds/60;rounds=integer(draft.rounds,1,100,'Rondas');
+  }else duration=integer(draft.duration,1,mode==='amrap'?180:120,'Duración');
   if(mode==='emom'){
    interval=integer(draft.interval,10,600,'Intervalo');
    if(duration*60%interval||duration*60/interval>120)throw new Error('El tiempo debe contener entre 1 y 120 intervalos completos.');
@@ -1007,12 +1046,12 @@ export function editWod(original,draft,state,profile){
  const interference=smart?(warnings.length?'Requiere revisión':'Dentro de los presupuestos relativos (orientativo)'):'No evaluada en modo libre';
  const name=String(draft.name||'').trim().slice(0,65),extraNotes=String(draft.notes||'').trim().slice(0,500);
  const fmt=formatMinutes(duration);
- const base=mode==='fortime'?`FOR TIME · CAP ${fmt}'`:mode==='amrap'?`AMRAP ${fmt}'`:mode==='emom'?`EMOM ${fmt}'`:`TABATA ${fmt}'`;
+ const base=mode==='fortime'?`FOR TIME · CAP ${formatCapSeconds(capSeconds)}`:mode==='amrap'?`AMRAP ${fmt}'`:mode==='emom'?`EMOM ${fmt}'`:`TABATA ${fmt}'`;
  const title=name?`${base} · ${name}`:base;
- const advice=mode==='fortime'?`${rounds} rondas por tiempo (CAP ${cap}'). Tiempo estimado orientativo: ${formatMinutes(expectedMinutes)} min.`:mode==='amrap'?`Máximas rondas y repeticiones en ${fmt} minutos.`:mode==='emom'?`${duration*60/interval} intervalos de ${interval} s, alternando ${n} estaciones.`:`${n} bloques de 8×(20 s trabajo / 10 s descanso)${n>1?`, ${tabata.betweenBlocksSeconds} s entre bloques`:''}. Duración total ${fmt} min.`;
+ const advice=mode==='fortime'?`${rounds} rondas por tiempo (CAP ${formatCapSeconds(capSeconds)}). Tiempo estimado orientativo: ${formatMinutes(expectedMinutes)} min.`:mode==='amrap'?`Máximas rondas y repeticiones en ${fmt} minutos.`:mode==='emom'?`${duration*60/interval} intervalos de ${interval} s, alternando ${n} estaciones.`:`${n} bloques de 8×(20 s trabajo / 10 s descanso)${n>1?`, ${tabata.betweenBlocksSeconds} s entre bloques`:''}. Duración total ${fmt} min.`;
  const costText=Object.entries(costs).sort((a,b)=>b[1]-a[1]).map(([p,v])=>`${PATTERN_NAMES[p]||p}: ${v.toFixed(1)}${smart?`/${(budgets[p]??5).toFixed(1)}`:''}`).join('; ');
  const notes=`Edición manual: no validada por la selección automática. Carga relativa estimada: ${costText}. ${smart?'Comparada con programación y resultados registrados. ':'Modo libre: sin validación de interferencias. '}${warnings.length?'Avisos: '+warnings.join(' '):''} Las cargas y alturas son prescripciones, no ajustes del modelo; no se garantiza el RPE ni la seguridad.${extraNotes?' Notas del atleta: '+extraNotes:''}`;
- const edited={...original,id:original.id,kind:'wod',title,mode,duration,cap,rounds,interval,tabata,movements:moves,patterns:[...new Set(moves.flatMap(m=>m.patterns))],profileName:profile.name,advice,notes,edited:true,editName:name,editNotes:extraNotes,objective:original.requestedObjective||original.objective,readiness:smart?readiness:original.readiness,
+ const edited={...original,id:original.id,kind:'wod',title,mode,duration,cap,...(mode==='fortime'?{capSeconds}:{}),rounds,interval,tabata,movements:moves,patterns:[...new Set(moves.flatMap(m=>m.patterns))],profileName:profile.name,advice,notes,edited:true,editName:name,editNotes:extraNotes,objective:original.requestedObjective||original.objective,readiness:smart?readiness:original.readiness,
   stimulusReport:{domains,interference,budgetUse:smart?budgetUse:null,expectedMinutes,advice:'Estimación manual sin puntuación de generación automática.'}, editWarnings:warnings,editedFrom:original.id};
  // Valida el mismo protocolo que se usa al pulsar Abrir contador WOD.
  contadorUrlForWod(edited);

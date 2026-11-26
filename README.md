@@ -1,3 +1,13 @@
+# Generador WOD 1.0.22 Beta — FOR TIME corto y precisión de resultados
+
+Base: 1.0.21 Beta validada. Generación FOR TIME seleccionada de 1–60 minutos; otros formatos mantienen mínimo 4 min. Los nuevos FOR TIME de 1–3 min ajustan rondas y volumen estimado, sin cambiar el motor habitual. En modo inteligente se mantienen requisitos técnicos, presupuestos y veto de interferencia: puede rechazar una combinación inviable. La duración estimada no garantiza rendimiento ni RPE. Editor FOR TIME: minutos y segundos, de 00:30 a 60:00; conserva rondas y avisos. Enlace compatible con Contador 2.2.6 Beta; CAP de segundos exactos, sin redondear minutos.
+
+Resultados: muestra décimas del tiempo medido, conserva milisegundos en `counterElapsedMs`. Atiende los cambios de fragmento en una pestaña reutilizada y restaura el resultado importado al guardar si el campo se ha quedado vacío; no sustituye un resultado introducido por el atleta. El descarte vuelve a limpiar el formulario. No se altera la clave de almacenamiento, catálogo ni registros anteriores. El análisis comparativo conserva su criterio previo de estimación mínima de un minuto y tiempo real mínimo de 30 segundos; los resultados más breves quedan registrados, pero no necesariamente comparados.
+
+Instalación: actualizar primero el Contador 2.2.6 Beta y luego los 11 archivos del Generador Beta. Conservar la copia JSON local; no borrar almacenamiento ni tocar repositorios estables. Abrir con conexión hasta ver v1.0.22 BETA. Validación: 108 generaciones FOR TIME cortas en modo libre (perfil completo, tres niveles), 40 generaciones habituales de cuatro formatos, tres ejemplos inteligentes, enlace, editor y límites, precisión y formulario con DOM simulado. Chromium bloqueó la navegación local: pendiente prueba real iPhone/Safari. No publicado en GitHub.
+
+---
+
 # Generador WOD · 1.0.21 Beta — Objetivo FOR TIME y descarte limpio
 
 Actualización sobre 1.0.20 Beta. Envía el número de rondas del FOR TIME al Contador 2.2.5 Beta, tanto en parámetros como en la ficha del WOD. Acepta la nueva causa de finalización por objetivo; conserva compatibilidad con resultados antiguos. La comparación FOR TIME exige exactamente las rondas previstas, un tiempo medido válido y una estimación previa; no incluye CAP ni resultados con exceso de marcas. Al descartar una importación se limpia el formulario de resultado, RPE, pesos, observaciones y selecciones de valoración, sin eliminar registros guardados ni el WOD. También se reinicia la valoración al recibir una importación nueva para no arrastrar valores anteriores. La selección del WOD puede seguir visible para registrar otra ejecución manual. Se mantiene el algoritmo de generación, catálogo, editor y clave de almacenamiento.

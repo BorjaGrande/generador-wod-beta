@@ -11,7 +11,7 @@
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="apple-touch-icon" href="./icon-192.png" />
   <link rel="icon" href="./icon-192.png" />
-  <link rel="stylesheet" href="./styles.css?v=1.0.21" />
+  <link rel="stylesheet" href="./styles.css?v=1.0.22" />
   <title>Generador WOD · Beta</title>
 </head>
 <body>
@@ -36,7 +36,7 @@
         <p id="smart-hint" class="hint">El modo inteligente requiere programación oficial cargada para la fecha del WOD.</p>
         <div class="form-grid">
           <label>Modalidad<select id="mode"><option value="random">Aleatoria</option><option value="amrap">AMRAP</option><option value="fortime">FOR TIME</option><option value="emom">EMOM</option><option value="tabata">TABATA</option></select></label>
-          <label>Duración (min)<input id="duration" type="number" min="4" max="60" step="1" value="15" /></label>
+          <label>Duración (min)<input id="duration" type="number" min="4" max="60" step="1" value="15" /><small id="duration-hint" class="hint">Duración habitual: 4–60 min (TABATA hasta 20 min).</small></label>
           <label>Nivel<select id="level"><option value="principiante">Principiante</option><option value="intermedio" selected>Intermedio</option><option value="avanzado">Avanzado / RX</option></select></label>
           <label>Objetivo<select id="objective"><option value="mixto">Mixto</option><option value="cardio">Cardio</option><option value="fuerza-resistencia">Fuerza-resistencia</option><option value="gimnasia">Gimnasia</option></select></label>
           <label class="wod-date-field">Fecha del WOD<input id="wod-date" type="date" required /></label>
@@ -106,8 +106,8 @@
       <button id="recovery-yes" type="button" class="button caution-action">Sí, generar WOD extra</button>
     </div>
   </dialog>
-  <footer><span id="connectivity">Comprobando conexión…</span><span>Generador WOD 1.0.21 Beta · independiente de Contador WOD</span></footer>
+  <footer><span id="connectivity">Comprobando conexión…</span><span>Generador WOD 1.0.22 Beta · independiente de Contador WOD</span></footer>
 </div>
-<script type="module" src="./app.mjs?v=1.0.21"></script>
+<script type="module" src="./app.mjs?v=1.0.22"></script>
 </body>
 </html>

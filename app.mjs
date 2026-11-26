@@ -1,5 +1,5 @@
-import {VERSION,EQUIPMENT_GROUPS,SKILLS,MOVEMENTS,OFFICIAL_MOVEMENT_CATALOG,OFFICIAL_LIBRARY_URL,unavailableRequirements,canGenerateMovement,PATTERN_NAMES,DEFAULT_STATE,sanitizeState,normalizeReadiness,isISODate,daysApart,getStress,generateWod,parsePlanCSV,formatWhatsapp,toCSV,contadorUrlForWod,parseCounterTransfer,editorMovements,editorMovementBlockers,editWod,searchMovements,suggestSubstitutions} from './core.mjs?v=1.0.21';
-import {analyzeTrainingResults} from './analytics.mjs?v=1.0.21';
+import {VERSION,EQUIPMENT_GROUPS,SKILLS,MOVEMENTS,OFFICIAL_MOVEMENT_CATALOG,OFFICIAL_LIBRARY_URL,unavailableRequirements,canGenerateMovement,PATTERN_NAMES,DEFAULT_STATE,sanitizeState,normalizeReadiness,isISODate,daysApart,getStress,generateWod,parsePlanCSV,formatWhatsapp,toCSV,contadorUrlForWod,parseCounterTransfer,editorMovements,editorMovementBlockers,editWod,searchMovements,suggestSubstitutions,formatMeasuredTime,formatCapSeconds} from './core.mjs?v=1.0.22';
+import {analyzeTrainingResults} from './analytics.mjs?v=1.0.22';
 const STORAGE_KEY='generador-wod-beta-v1';
 // La etiqueta de versión depende del motor importado, no sólo del HTML.
 document.querySelector('.version').textContent=`v${VERSION.replace('-beta',' BETA')}`;
@@ -189,6 +189,8 @@ function renderWod(w){
  panel.append(actions);
 }
 function renderLogWodOptions(){const select=$('log-wod');const prev=select.value;select.replaceChildren();const unique=[...(pendingCounterResult?.fallbackWod?[pendingCounterResult.fallbackWod]:[]),...(state.lastWod?[state.lastWod]:[]),...state.wods].filter((w,i,arr)=>arr.findIndex(x=>x.id===w.id)===i).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));if(!unique.length){select.append(option('','Primero genera un WOD'));return}for(const w of unique)select.append(option(w.id,`${w.date} · ${w.title} (${w.strategy})`));if(unique.some(w=>w.id===prev))select.value=prev;}
+function updateDurationRange(){const input=$('duration'),min=$('mode').value==='fortime'?1:4;input.min=String(min);if(Number(input.value)<min)input.value=String(min);$('duration-hint').textContent=min===1?'FOR TIME: 1–60 min; edición manual desde 30 s.':'Duración habitual: 4–60 min (TABATA hasta 20 min).';}
+$('mode').addEventListener('change',updateDurationRange);
 function getGenerateOptions(){const readiness=readReadiness();return {mode:$('mode').value,strategy:document.querySelector('input[name="strategy"]:checked').value,duration:Number($('duration').value),level:$('level').value,objective:$('objective').value,date:$('wod-date').value,readiness,effort:readiness.effort};}
 function displayGenerated(wod){
  if(wod.kind==='recovery'){state.lastRecommendation=wod;state.lastWod=null;}
@@ -236,6 +238,7 @@ $('generate').addEventListener('click',()=>{
 function getLogWod(id){return [pendingCounterResult?.fallbackWod,state.lastWod,...state.wods].find(w=>w?.id===id)}
 function forgetImportedResult(){
  pendingCounterResult=null;
+ $('log-form').elements.result.required=true;
  $('counter-import-banner').classList.add('hidden');
  if(location.hash.startsWith('#wodresult='))history.replaceState(null,'',location.pathname+location.search);
 }
@@ -261,11 +264,11 @@ function importCounterResultFromHash(){
  const f=$('log-form');f.reset();f.elements.wod.value=meta.id;
  const done=new Date(transfer.finishedAt);
  f.elements.date.value=[done.getFullYear(),String(done.getMonth()+1).padStart(2,'0'),String(done.getDate()).padStart(2,'0')].join('-');
- f.elements.result.value=transfer.result;
+ f.elements.result.value=transfer.result;f.elements.result.required=false;
  f.elements.rpe.value=''; // El RPE nunca se inventa: lo introduce el atleta.
  f.elements.weights.value='';f.elements.notes.value='';
  const banner=$('counter-import-banner');banner.classList.remove('hidden');
- $('counter-import-text').textContent=`${meta.title} · ${transfer.result} · Tiempo medido ${Math.floor(transfer.elapsedMs/60000)}:${String(Math.floor(transfer.elapsedMs/1000)%60).padStart(2,'0')}. Completa RPE y cargas para guardarlo.${!saved?' El WOD original no estaba en este almacenamiento: se ha recuperado del enlace. Si estás en Safari, este registro puede no aparecer en el Generador instalado.':''}`;
+ $('counter-import-text').textContent=`${meta.title} · ${transfer.result} · Tiempo medido ${formatMeasuredTime(transfer.elapsedMs)}. Completa RPE y cargas para guardarlo.${!saved?' El WOD original no estaba en este almacenamiento: se ha recuperado del enlace. Si estás en Safari, este registro puede no aparecer en el Generador instalado.':''}`;
  notice('Resultado recibido del Contador. Comprueba el WOD y completa el RPE real.');
  banner.scrollIntoView({behavior:'auto',block:'start'});
 }
@@ -276,7 +279,7 @@ $('dismiss-counter-import').addEventListener('click',()=>{
  $('counter-import-text').textContent='';
  notice('Importación descartada. El resultado original sigue en el Contador.','warn');
 });
-$('log-form').addEventListener('submit',ev=>{ev.preventDefault();const f=ev.currentTarget;const d=Object.fromEntries(new FormData(f));const w=getLogWod(d.wod);if(!w){notice('Genera un WOD antes de registrar su resultado.','error');return}if(!isISODate(d.date)||!d.result?.trim()){notice('Introducir fecha y resultado válido.','error');return}
+$('log-form').addEventListener('submit',ev=>{ev.preventDefault();const f=ev.currentTarget;const d=Object.fromEntries(new FormData(f));if(pendingCounterResult&&pendingCounterResult.transfer.wod.id===d.wod&&!d.result?.trim()){d.result=pendingCounterResult.transfer.result;f.elements.result.value=d.result;}const w=getLogWod(d.wod);if(!w){notice('Genera un WOD antes de registrar su resultado.','error');return}if(!isISODate(d.date)||!d.result?.trim()){notice('Introducir fecha y resultado válido.','error');return}
  if(!Number.isInteger(Number(d.rpe))||Number(d.rpe)<1||Number(d.rpe)>10){notice('Introduce tu RPE real (entre 1 y 10).','error');return}
  if(pendingCounterResult&&pendingCounterResult.transfer.wod.id!==w.id){notice('El resultado del Contador corresponde a otro WOD. Descarta la transferencia antes de registrar uno distinto.','error');return}
  if(pendingCounterResult&&state.logs.some(l=>l.counterRunId===pendingCounterResult.transfer.runId)){notice('Esta ejecución del Contador ya está registrada.','warn');return}
@@ -351,7 +354,10 @@ $('export-logs').addEventListener('click',()=>{const headers=['date','title','mo
 $('restore-file').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{if(file.size>3_000_000)throw new Error('La copia supera 3 MB.');const raw=JSON.parse(await file.text());if(!raw||typeof raw!=='object'||!Array.isArray(raw.profiles)||!Array.isArray(raw.plan)||!Array.isArray(raw.logs)||!Array.isArray(raw.wods))throw new Error('Formato de copia incompatible.');if(!confirm('Esto sustituirá TODOS los perfiles, programación y resultados actuales. ¿Continuar?'))return;state=sanitizeState(raw);save();renderAll();notice('Copia restaurada.');}catch(err){notice(`No se pudo restaurar: ${err.message}`,'error')}finally{e.target.value=''}});
 function renderAll(){renderProfiles();renderInventory();renderCatalog();renderReadiness();renderPlan();renderWod(state.lastRecommendation||state.lastWod);renderLogs();}
 function connection(){const offline=!navigator.onLine;$('connectivity').textContent=offline?'Sin conexión · datos locales':'Con conexión · datos locales'}window.addEventListener('online',connection);window.addEventListener('offline',connection);
-const date=now();$('wod-date').value=date;$('plan-form').elements.date.value=date;$('log-form').elements.date.value=date;renderAll();connection();importCounterResultFromHash();
+const date=now();$('wod-date').value=date;$('plan-form').elements.date.value=date;$('log-form').elements.date.value=date;renderAll();updateDurationRange();connection();importCounterResultFromHash();
+// Safari puede reutilizar la misma pestaña al regresar desde el Contador.
+window.addEventListener('hashchange',()=>{if(location.hash.startsWith('#wodresult='))importCounterResultFromHash();});
+window.addEventListener('pageshow',e=>{if(e.persisted&&location.hash.startsWith('#wodresult=')&&!pendingCounterResult)importCounterResultFromHash();});
 if('serviceWorker' in navigator && location.protocol==='https:')navigator.serviceWorker.register('./sw.js').catch(err=>console.warn('No se pudo activar modo offline:',err));
 
 // Editor transaccional: el WOD original no cambia hasta aplicar los cambios.
@@ -361,7 +367,8 @@ function openWodEditor(original){
  const byId=new Map(catalog.map(m=>[m.id,m]));
  const mode=original.mode,max=mode==='tabata'?6:8;
  const unitLabels={reps:'Repeticiones',meters:'Distancia (m)',cals:'Calorías',sec:'Tiempo (s)',climbs:'Ascensos'};
- const draft={duration:original.duration,rounds:original.rounds||3,interval:original.interval||60,pause:original.tabata?.betweenBlocksSeconds||0,name:original.editName||'',notes:original.editNotes||'',movements:original.movements.map(m=>({id:m.id,units:Number.parseFloat(m.amount)||m.units||10,kg:m.editKg??'',height:m.editHeight??''}))};
+ const originalCap=original.capSeconds??Math.round((original.cap??original.duration)*60);
+ const draft={duration:original.duration,...(original.mode==='fortime'?{capMinutes:Math.floor(originalCap/60),capSeconds:originalCap%60}:{}),rounds:original.rounds||3,interval:original.interval||60,pause:original.tabata?.betweenBlocksSeconds||0,name:original.editName||'',notes:original.editNotes||'',movements:original.movements.map(m=>({id:m.id,units:Number.parseFloat(m.amount)||m.units||10,kg:m.editKg??'',height:m.editHeight??''}))};
  const dialog=node('dialog',null,'editor-dialog');dialog.setAttribute('aria-label','Editar WOD');
  const header=node('div',null,'editor-head');header.append(node('h2','Editar WOD'),btn('Cancelar',()=>dialog.close(),'ghost small'));dialog.append(header,node('p',`Formato: ${mode.toUpperCase()} · Material: ${profile.name}. El original no se modifica hasta aplicar.`,'hint'));
  const settings=node('div',null,'form-grid');
@@ -372,7 +379,8 @@ function openWodEditor(original){
   if(config.textarea)input.rows=2;input.value=value??'';
   input.addEventListener('input',()=>{onChange(input.value);refresh()});l.append(input);parent.append(l);return input;
  }
- if(mode!=='tabata')field(settings,mode==='fortime'?'CAP (min)':'Duración (min)',draft.duration,v=>draft.duration=v,{min:1,max:mode==='amrap'?180:mode==='fortime'?60:120});
+ if(mode==='fortime'){field(settings,'CAP · minutos',draft.capMinutes,v=>draft.capMinutes=v,{min:0,max:60});field(settings,'CAP · segundos',draft.capSeconds,v=>draft.capSeconds=v,{min:0,max:59});}
+ else if(mode!=='tabata')field(settings,'Duración (min)',draft.duration,v=>draft.duration=v,{min:1,max:mode==='amrap'?180:120});
  if(mode==='fortime')field(settings,'Rondas',draft.rounds,v=>draft.rounds=v,{min:1,max:100});
  if(mode==='emom')field(settings,'Intervalo (s)',draft.interval,v=>draft.interval=v,{min:10,max:600});
  if(mode==='tabata')field(settings,'Pausa entre bloques (s)',draft.pause,v=>draft.pause=v,{min:0,max:600});
@@ -395,8 +403,8 @@ function openWodEditor(original){
  function refresh(){
   preview.replaceChildren();try{
    const r=editWod(original,draft,state,profile);apply.disabled=false;
-   preview.append(node('strong',`Duración programada: ${Number(r.wod.duration.toFixed(2))} min`));
-   if(mode==='fortime')preview.append(node('p',`Tiempo estimado: ${r.expectedMinutes} min · CAP ${r.wod.cap} min`));
+   preview.append(node('strong',mode==='fortime'?`CAP programado: ${formatCapSeconds(r.wod.capSeconds)}`:`Duración programada: ${Number(r.wod.duration.toFixed(2))} min`));
+   if(mode==='fortime')preview.append(node('p',`Tiempo estimado: ${r.expectedMinutes} min · CAP ${formatCapSeconds(r.wod.capSeconds)}`));
    if(mode==='emom')preview.append(node('p',r.wod.advice));
    preview.append(node('p',r.wod.notes));
    if(r.warnings.length)preview.classList.add('editor-warning');else preview.classList.remove('editor-warning');
